@@ -14,20 +14,20 @@ setup(
         'dpuctl',
         'tests'
     ],
-    setup_requires= [
+    setup_requires=[
         'pytest-runner'
     ],
-    install_requires = [
+    install_requires=[
         'inotify',
     ],
-    tests_require = [
+    tests_require=[
         'pytest',
         'mock>=2.0.0'
     ],
     entry_points={
         'console_scripts': [
-        'dpuctl = dpuctl.main:dpuctl',
-        ]
+                            'dpuctl = dpuctl.main:dpuctl',
+                            ]
     },
     classifiers=[
         'Development Status :: 3 - Alpha',
