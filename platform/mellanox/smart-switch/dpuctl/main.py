@@ -10,32 +10,50 @@ except ImportError as e:
 
 def call_dpu_fw_upgrade(obj, path):
     """Function to call object specific firmware update for each dpu"""
-    obj.dpu_fw_upgrade(path)
+    try:
+        obj.dpu_fw_upgrade(path)
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 def call_dpu_reset(obj):
     """Function to call object specific Reset for each dpu"""
-    obj.dpu_reboot()
+    try:
+        obj.dpu_reboot()
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 def call_dpu_shutdown(obj):
     """Function to call object specific Shutdown for each dpu"""
-    obj.dpu_shutdown()
+    try:
+        obj.dpu_shutdown()
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 def call_dpu_startup(obj):
     """Function to call object specific Startup for each dpu"""
-    obj.dpu_startup()
+    try:
+        obj.dpu_startup()
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 def call_dpu_power_on(obj, force):
     """Function to call object specific power on for each dpu"""
-    obj.dpu_power_on(force)
+    try:
+        obj.dpu_power_on(force)
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 def call_dpu_power_off(obj, force):
     """Function to call object specific power off for each dpu"""
-    obj.dpu_power_off(force)
+    try:
+        obj.dpu_power_off(force)
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 def validate_return_dpus(all_dpus, dpu_names, dpuctl_list):
@@ -65,31 +83,36 @@ def execute_function_call(ctx,
                           path=None):
     """Function to fork multiple child process for each DPU
        and call required function"""
-    dpuctl_list = ctx.obj['dpuctl_list']
-    selected_dpus = validate_return_dpus(all_dpus, dpu_names, dpuctl_list)
-    selected_dpus = list(set(selected_dpus))
-    proc_list = []
-    for dpu in dpuctl_list:
-        if dpu.get_name() in selected_dpus:
-            if function_to_call == "FW_UPG":
-                if not path:
-                    raise AssertionError("Path for FW image is empty!")
-                proc = Process(target=call_dpu_fw_upgrade, args=(dpu, path))
-            elif function_to_call == "PW_ON":
-                proc = Process(target=call_dpu_power_on, args=(dpu, force))
-            elif function_to_call == "PW_OFF":
-                proc = Process(target=call_dpu_power_off, args=(dpu, force))
-            elif function_to_call == "RST":
-                proc = Process(target=call_dpu_reset, args=(dpu,))
-            elif function_to_call == "SHTDN":
-                proc = Process(target=call_dpu_shutdown, args=(dpu, ))
-            elif function_to_call == "STRTUP":
-                proc = Process(target=call_dpu_startup, args=(dpu, ))
-            proc_list.append(proc)
-    for proc in proc_list:
-        proc.start()
-    for proc in proc_list:
-        proc.join()
+    try:
+        dpuctl_list = ctx.obj['dpuctl_list']
+        selected_dpus = validate_return_dpus(all_dpus, dpu_names, dpuctl_list)
+        selected_dpus = list(set(selected_dpus))
+        proc_list = []
+        for dpu in dpuctl_list:
+            if dpu.get_name() in selected_dpus:
+                if function_to_call == "FW_UPG":
+                    if not path:
+                        raise AssertionError("Path for FW image is empty!")
+                    proc = Process(target=call_dpu_fw_upgrade,
+                                   args=(dpu, path))
+                elif function_to_call == "PW_ON":
+                    proc = Process(target=call_dpu_power_on, args=(dpu, force))
+                elif function_to_call == "PW_OFF":
+                    proc = Process(target=call_dpu_power_off,
+                                   args=(dpu, force))
+                elif function_to_call == "RST":
+                    proc = Process(target=call_dpu_reset, args=(dpu,))
+                elif function_to_call == "SHTDN":
+                    proc = Process(target=call_dpu_shutdown, args=(dpu, ))
+                elif function_to_call == "STRTUP":
+                    proc = Process(target=call_dpu_startup, args=(dpu, ))
+                proc_list.append(proc)
+        for proc in proc_list:
+            proc.start()
+        for proc in proc_list:
+            proc.join()
+    except Exception as error:
+        print(f"An error occurred: {type(error).__name__} - {error}")
 
 
 @click.group()

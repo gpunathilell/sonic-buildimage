@@ -2,14 +2,14 @@
 testData = {
              'PW_OFF': {'AssertionError':
                         {'arg_list': [['dpu5'],
-                                      ['dpu1', '--all',],
+                                      ['dpu1', '--all'],
                                       ['dpu1,dpu2,dpu3,dpu5'],
                                       ['dpu5', '--all'],
                                       ['dpu5', '--all', '--force'],
                                       ]},
                         'Returncheck':
                         {'arg_list': [['dpu1'],
-                                      ['dpu1, dpu2,dpu3', '--force',],
+                                      ['dpu1, dpu2,dpu3', '--force'],
                                       ['--all', '--force'],
                                       ['dpu4', '--path'],
                                       ['--all', '--test'],
@@ -32,14 +32,14 @@ testData = {
                         },
              'PW_ON': {'AssertionError':
                        {'arg_list': [['dpu5'],
-                                     ['dpu1', '--all',],
+                                     ['dpu1', '--all'],
                                      ['dpu1,dpu2,dpu3,dpu5'],
                                      ['dpu5', '--all'],
                                      ['dpu5', '--all', '--force'],
                                      ]},
                        'Returncheck':
                        {'arg_list': [['dpu1'],
-                                     ['dpu1,dpu2,dpu3', '--force',],
+                                     ['dpu1,dpu2,dpu3', '--force'],
                                      ['--all'],
                                      ['--all', '--force'],
                                      ['dpu4', '--path'],
@@ -207,4 +207,31 @@ testData = {
                                             "No such option: --test\n"],
                          }
                         },
+             'power_off': ["dpu1: Power off forced=True\nAn error occurred: "
+                           "FileNotFoundError - dpu1:"
+                           "File /var/run/hw-management"
+                           "/system/dpu1_pwr_force does not exist!\n",
+                           "dpu1: Power off forced=False\nAn error occurred: "
+                           "FileNotFoundError - dpu1:"
+                           "File /var/run/hw-management"
+                           "/system/dpu1_rst does not exist!\n",
+                           ],
+             'power_on': ["dpu1: Power on forced=True\nAn error occurred: "
+                          "FileNotFoundError - dpu1:"
+                          "File /var/run/hw-management"
+                          "/system/dpu1_pwr_force does not exist!\n",
+                          "dpu1: Power on forced=False\nAn error occurred: "
+                          "FileNotFoundError - dpu1:File "
+                          "/var/run/hw-management"
+                          "/system/dpu1_pwr does not exist!\n",
+                          ],
+             'reset': ["dpu1: Reboot\nAn error occurred: "
+                       "FileNotFoundError - dpu1:File /sys/bus/pci/devices/"
+                       "dpu1_pciid/remove does not exist!\n",
+                       ],
+             'fw_upgrade': ["dpu1: FW upgrade\nAn error occurred: "
+                            "FileNotFoundError - dpu1:File "
+                            "/sys/bus/pci/devices/"
+                            "dpu1_id/remove does not exist!\n",
+                            ],
 }

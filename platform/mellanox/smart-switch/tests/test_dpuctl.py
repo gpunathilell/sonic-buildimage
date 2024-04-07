@@ -44,8 +44,9 @@ def dpuctl_command_exec(exec_cmd, command_name):
     runner = CliRunner()
     assertion_checks = test_data_checks['AssertionError']
     for args in assertion_checks['arg_list']:
-        with pytest.raises(AssertionError, match=r"Invalid Arguments"):
-            runner.invoke(exec_cmd, args, catch_exceptions=False, obj=obj)
+        result = runner.invoke(exec_cmd, args, catch_exceptions=False, obj=obj)
+        assert "AssertionError" in result.output
+
     result_checks = test_data_checks['Returncheck']
     for index_value in range(len(result_checks['arg_list'])):
         args = result_checks['arg_list'][index_value]
@@ -113,14 +114,16 @@ class Testdpuctl:
     @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
            MagicMock(return_value=True))
     @patch('dpuctl.inotify_helper.InotifyHelper.__init__')
-    def test_power_off(self, mock_inotify):
+    def test_power_off(self, mock_inotify, capsys):
         """Tests for Per DPU Power Off function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
-        with pytest.raises(FileNotFoundError, match=r"dpu1_pwr_force"):
-            call_dpu_power_off(dpuctl_obj, True)
-        with pytest.raises(FileNotFoundError, match=r"dpu1_rst"):
-            call_dpu_power_off(dpuctl_obj, False)
+        call_dpu_power_off(dpuctl_obj, True)
+        result = capsys.readouterr()
+        assert result.out == testData["power_off"][0]
+        call_dpu_power_off(dpuctl_obj, False)
+        result = capsys.readouterr()
+        assert result.out == testData["power_off"][1]
         written_data = []
 
         def mock_write_file(file_name, content_towrite, dpu_name):
@@ -128,8 +131,8 @@ class Testdpuctl:
                                  "data": content_towrite,
                                  "dpu_name": dpu_name})
             return True
-        existing_wr_file = dpuctl_hwm.write_file
-        dpuctl_hwm.write_file = mock_write_file
+        existing_wr_file = dpuctl_obj.write_file
+        dpuctl_obj.write_file = mock_write_file
         call_dpu_power_off(dpuctl_obj, True)
         assert written_data[0]["file"].endswith(
                 f"{dpuctl_obj.get_name()}_pwr_force")
@@ -142,20 +145,22 @@ class Testdpuctl:
         assert "1" == written_data[0]["data"]
         assert written_data[1]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr")
         assert "1" == written_data[1]["data"]
-        dpuctl_hwm.write_file = existing_wr_file
+        dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
            MagicMock(return_value=True))
     @patch('dpuctl.inotify_helper.InotifyHelper.__init__')
-    def test_power_on(self, mock_inotify):
+    def test_power_on(self, mock_inotify, capsys):
         """Tests for Per DPU Power On function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
-        with pytest.raises(FileNotFoundError, match=r"dpu1_pwr_force"):
-            call_dpu_power_on(dpuctl_obj, True)
-        with pytest.raises(FileNotFoundError, match=r"dpu1_pwr"):
-            call_dpu_power_on(dpuctl_obj, False)
+        call_dpu_power_on(dpuctl_obj, True)
+        result = capsys.readouterr()
+        assert result.out == testData["power_on"][0]
+        call_dpu_power_on(dpuctl_obj, False)
+        result = capsys.readouterr()
+        assert result.out == testData["power_on"][1]
         written_data = []
 
         def mock_write_file(file_name, content_towrite, dpu_name):
@@ -163,8 +168,8 @@ class Testdpuctl:
                                  "data": content_towrite,
                                  "dpu_name": dpu_name})
             return True
-        existing_wr_file = dpuctl_hwm.write_file
-        dpuctl_hwm.write_file = mock_write_file
+        existing_wr_file = dpuctl_obj.write_file
+        dpuctl_obj.write_file = mock_write_file
         call_dpu_power_on(dpuctl_obj, True)
         assert mock_inotify.call_args.args[0].endswith(
                 f"{dpuctl_obj.get_name()}_ready")
@@ -175,7 +180,7 @@ class Testdpuctl:
         call_dpu_power_on(dpuctl_obj, False)
         assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr")
         assert "0" == written_data[0]["data"]
-        dpuctl_hwm.write_file = existing_wr_file
+        dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('sonic_platform.utils.read_str_from_file',
@@ -183,12 +188,13 @@ class Testdpuctl:
     @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
            MagicMock(return_value=1))
     @patch('dpuctl.inotify_helper.InotifyHelper.__init__')
-    def test_dpu_reset(self, mock_inotify):
+    def test_dpu_reset(self, mock_inotify, capsys):
         """Tests for Per DPU Reset function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
-        with pytest.raises(FileNotFoundError, match=r"dpu1_pciid"):
-            call_dpu_reset(dpuctl_obj)
+        call_dpu_reset(dpuctl_obj)
+        result = capsys.readouterr()
+        assert result.out == testData["reset"][0]
         written_data = []
 
         def mock_write_file(file_name, content_towrite, dpu_name):
@@ -196,8 +202,8 @@ class Testdpuctl:
                                  "data": content_towrite,
                                  "dpu_name": dpu_name})
             return True
-        existing_wr_file = dpuctl_hwm.write_file
-        dpuctl_hwm.write_file = mock_write_file
+        existing_wr_file = dpuctl_obj.write_file
+        dpuctl_obj.write_file = mock_write_file
         call_dpu_reset(dpuctl_obj)
         assert written_data[0]["file"].endswith("remove")
         assert "1" == written_data[0]["data"]
@@ -209,7 +215,7 @@ class Testdpuctl:
         assert "1" == written_data[3]["data"]
         assert mock_inotify.call_args.args[0].endswith(
                 f"{dpuctl_obj.get_name()}_ready")
-        dpuctl_hwm.write_file = existing_wr_file
+        dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('sonic_platform.utils.read_str_from_file',
@@ -217,12 +223,14 @@ class Testdpuctl:
     @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
            MagicMock(return_value=1))
     @patch('dpuctl.inotify_helper.InotifyHelper.__init__')
-    def test_dpu_fw_upgrade(self, mock_inotify):
+    def test_dpu_fw_upgrade(self, mock_inotify, capsys):
         """Tests for Per DPU Firmware Upgrade function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
-        with pytest.raises(FileNotFoundError, match=r"dpu1_id"):
-            call_dpu_fw_upgrade(dpuctl_obj, None)
+        call_dpu_fw_upgrade(dpuctl_obj, None)
+        result = capsys.readouterr()
+        assert result.out == testData["fw_upgrade"][0]
+        written_data = []
         written_data = []
 
         def mock_write_file(file_name, content_towrite, dpu_name):
@@ -230,8 +238,8 @@ class Testdpuctl:
                                  "data": content_towrite,
                                  "dpu_name": dpu_name})
             return True
-        existing_wr_file = dpuctl_hwm.write_file
-        dpuctl_hwm.write_file = mock_write_file
+        existing_wr_file = dpuctl_obj.write_file
+        dpuctl_obj.write_file = mock_write_file
         call_dpu_fw_upgrade(dpuctl_obj, None)
         print(written_data)
         assert written_data[0]["file"].endswith("remove")
@@ -248,7 +256,7 @@ class Testdpuctl:
         assert "1" == written_data[4]["data"]
         assert mock_inotify.call_args.args[0].endswith(
                 f"{dpuctl_obj.get_name()}_ready")
-        dpuctl_hwm.write_file = existing_wr_file
+        dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('sonic_platform.utils.read_str_from_file',
@@ -267,8 +275,8 @@ class Testdpuctl:
                                  "data": content_towrite,
                                  "dpu_name": dpu_name})
             return True
-        existing_wr_file = dpuctl_hwm.write_file
-        dpuctl_hwm.write_file = mock_write_file
+        existing_wr_file = dpuctl_obj.write_file
+        dpuctl_obj.write_file = mock_write_file
         call_dpu_shutdown(dpuctl_obj)
         print(written_data)
         assert written_data[0]["file"].endswith("remove")
@@ -284,7 +292,7 @@ class Testdpuctl:
         assert written_data[3]["file"].endswith(
                 f"{dpuctl_obj.get_name()}_pwr")
         assert "1" == written_data[3]["data"]
-        dpuctl_hwm.write_file = existing_wr_file
+        dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('sonic_platform.utils.read_str_from_file',
@@ -303,8 +311,8 @@ class Testdpuctl:
                                  "data": content_towrite,
                                  "dpu_name": dpu_name})
             return True
-        existing_wr_file = dpuctl_hwm.write_file
-        dpuctl_hwm.write_file = mock_write_file
+        existing_wr_file = dpuctl_obj.write_file
+        dpuctl_obj.write_file = mock_write_file
         call_dpu_startup(dpuctl_obj)
         print(written_data)
         assert written_data[0]["file"].endswith(
@@ -314,7 +322,7 @@ class Testdpuctl:
                 f"{dpuctl_obj.get_name()}_ready")
         assert written_data[1]["file"].endswith("rescan")
         assert "1" == written_data[1]["data"]
-        dpuctl_hwm.write_file = existing_wr_file
+        dpuctl_obj.write_file = existing_wr_file
 
     @classmethod
     def teardown_class(cls):
