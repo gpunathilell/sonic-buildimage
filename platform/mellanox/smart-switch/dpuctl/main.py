@@ -24,22 +24,6 @@ def call_dpu_reset(obj):
         print(f"An error occurred: {type(error).__name__} - {error}")
 
 
-def call_dpu_shutdown(obj):
-    """Function to call object specific Shutdown for each dpu"""
-    try:
-        obj.dpu_shutdown()
-    except Exception as error:
-        print(f"An error occurred: {type(error).__name__} - {error}")
-
-
-def call_dpu_startup(obj):
-    """Function to call object specific Startup for each dpu"""
-    try:
-        obj.dpu_startup()
-    except Exception as error:
-        print(f"An error occurred: {type(error).__name__} - {error}")
-
-
 def call_dpu_power_on(obj, force):
     """Function to call object specific power on for each dpu"""
     try:
@@ -102,10 +86,6 @@ def execute_function_call(ctx,
                                    args=(dpu, force))
                 elif function_to_call == "RST":
                     proc = Process(target=call_dpu_reset, args=(dpu,))
-                elif function_to_call == "SHTDN":
-                    proc = Process(target=call_dpu_shutdown, args=(dpu, ))
-                elif function_to_call == "STRTUP":
-                    proc = Process(target=call_dpu_startup, args=(dpu, ))
                 proc_list.append(proc)
         for proc in proc_list:
             proc.start()
@@ -161,32 +141,6 @@ def dpuctl_reset(ctx, all_dpus, dpu_names=None):
 def dpuctl_power_on(ctx, force, all_dpus, dpu_names=None):
     """Power On individual or all DPUs"""
     execute_function_call(ctx, all_dpus, force, dpu_names, "PW_ON")
-
-
-@dpuctl.command(name='dpu-startup')
-@click.option('--all',
-              'all_dpus',
-              is_flag=True,
-              default=False,
-              help='Execute for all DPUs')
-@click.argument('dpu_names', metavar='<dpu_names>', required=False)
-@click.pass_context
-def dpuctl_startup(ctx, all_dpus, dpu_names=None):
-    """Start Up individual or all DPUs"""
-    execute_function_call(ctx, all_dpus, None, dpu_names, "STRTUP")
-
-
-@dpuctl.command(name='dpu-shutdown')
-@click.option('--all',
-              'all_dpus',
-              is_flag=True,
-              default=False,
-              help='Execute for all DPUs')
-@click.argument('dpu_names', metavar='<dpu_names>', required=False)
-@click.pass_context
-def dpuctl_shutdown(ctx, all_dpus, dpu_names=None):
-    """Shutdown individual or all DPUs"""
-    execute_function_call(ctx, all_dpus, None, dpu_names, "SHTDN")
 
 
 @dpuctl.command(name='dpu-power-off')

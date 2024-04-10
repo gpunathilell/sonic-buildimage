@@ -5,8 +5,7 @@ import pytest
 
 from click.testing import CliRunner
 from dpuctl.main import call_dpu_power_on, call_dpu_power_off, call_dpu_reset
-from dpuctl.main import call_dpu_shutdown, call_dpu_fw_upgrade
-from dpuctl.main import call_dpu_startup
+from dpuctl.main import call_dpu_fw_upgrade
 import dpuctl.main as dpuctl_main
 from dpuctl import dpuctl_hwm
 from dpuctl.dpuctl_hwm import DpuCtlPlat
@@ -95,20 +94,6 @@ class Testdpuctl:
         """Tests for dpuctl click Implementation for Firmware Upgrade API"""
         exec_cmd = dpuctl_main.dpuctl_fw_upgrade
         dpuctl_command_exec(exec_cmd, "FW_UPG")
-
-    @patch('multiprocessing.Process.start', MagicMock(return_value=True))
-    @patch('multiprocessing.Process.join', MagicMock(return_value=True))
-    def test_dpuctl_startup(self):
-        """Tests for dpuctl click Implementation for Startup API"""
-        exec_cmd = dpuctl_main.dpuctl_startup
-        dpuctl_command_exec(exec_cmd, "STRTUP")
-
-    @patch('multiprocessing.Process.start', MagicMock(return_value=True))
-    @patch('multiprocessing.Process.join', MagicMock(return_value=True))
-    def test_dpuctl_shutdown(self):
-        """Tests for dpuctl click Implementation for Shutdown API"""
-        exec_cmd = dpuctl_main.dpuctl_shutdown
-        dpuctl_command_exec(exec_cmd, "SHTDN")
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
@@ -256,72 +241,6 @@ class Testdpuctl:
         assert "1" == written_data[4]["data"]
         assert mock_inotify.call_args.args[0].endswith(
                 f"{dpuctl_obj.get_name()}_ready")
-        dpuctl_obj.write_file = existing_wr_file
-
-    @patch('os.path.exists', MagicMock(return_value=True))
-    @patch('sonic_platform.utils.read_str_from_file',
-           MagicMock(return_value="dpu1_id"))
-    @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
-           MagicMock(return_value=1))
-    @patch('dpuctl.inotify_helper.InotifyHelper.__init__')
-    def test_dpu_shutdown(self, mock_inotify):
-        """Tests for Per DPU Shutdown function"""
-        dpuctl_obj = obj["dpuctl_list"][0]
-        mock_inotify.return_value = None
-        written_data = []
-
-        def mock_write_file(file_name, content_towrite, dpu_name):
-            written_data.append({"file": file_name,
-                                 "data": content_towrite,
-                                 "dpu_name": dpu_name})
-            return True
-        existing_wr_file = dpuctl_obj.write_file
-        dpuctl_obj.write_file = mock_write_file
-        call_dpu_shutdown(dpuctl_obj)
-        print(written_data)
-        assert written_data[0]["file"].endswith("remove")
-        assert "1" == written_data[0]["data"]
-        assert written_data[1]["file"].endswith(
-                f"{dpuctl_obj.get_name()}_rst")
-        assert "1" == written_data[1]["data"]
-        assert mock_inotify.call_args.args[0].endswith(
-                f"{dpuctl_obj.get_name()}_shtdn_ready")
-        assert written_data[2]["file"].endswith(
-                f"{dpuctl_obj.get_name()}_rst")
-        assert "1" == written_data[2]["data"]
-        assert written_data[3]["file"].endswith(
-                f"{dpuctl_obj.get_name()}_pwr")
-        assert "1" == written_data[3]["data"]
-        dpuctl_obj.write_file = existing_wr_file
-
-    @patch('os.path.exists', MagicMock(return_value=True))
-    @patch('sonic_platform.utils.read_str_from_file',
-           MagicMock(return_value="dpu1_id"))
-    @patch('dpuctl.inotify_helper.InotifyHelper.add_watch',
-           MagicMock(return_value=1))
-    @patch('dpuctl.inotify_helper.InotifyHelper.__init__')
-    def test_dpu_startup(self, mock_inotify):
-        """Tests for Per DPU Startup function"""
-        dpuctl_obj = obj["dpuctl_list"][0]
-        mock_inotify.return_value = None
-        written_data = []
-
-        def mock_write_file(file_name, content_towrite, dpu_name):
-            written_data.append({"file": file_name,
-                                 "data": content_towrite,
-                                 "dpu_name": dpu_name})
-            return True
-        existing_wr_file = dpuctl_obj.write_file
-        dpuctl_obj.write_file = mock_write_file
-        call_dpu_startup(dpuctl_obj)
-        print(written_data)
-        assert written_data[0]["file"].endswith(
-                f"{dpuctl_obj.get_name()}_pwr")
-        assert "0" == written_data[0]["data"]
-        assert mock_inotify.call_args.args[0].endswith(
-                f"{dpuctl_obj.get_name()}_ready")
-        assert written_data[1]["file"].endswith("rescan")
-        assert "1" == written_data[1]["data"]
         dpuctl_obj.write_file = existing_wr_file
 
     @classmethod

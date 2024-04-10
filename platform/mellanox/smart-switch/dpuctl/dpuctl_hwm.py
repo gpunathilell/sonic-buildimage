@@ -132,15 +132,6 @@ class DpuCtlPlat():
                   cmd_exc.returncode,
                   cmd_exc.output)"""
 
-    def dpu_shutdown(self):
-        """Per DPU Firmware Update API"""
-        print(f"{self.get_name()}: Shut down")
-        self.dpu_reboot_prep()
-        self.dpu_pci_remove()
-        self.dpu_go_down()
-        self.dpu_power_off()
-        print(f"{self.get_name()}: Shut down complete")
-
     def dpu_pci_scan(self):
         """PCI Scan API"""
         set_pci_scan = "/sys/bus/pci/rescan"
@@ -154,13 +145,6 @@ class DpuCtlPlat():
                                               raise_exception=True)
         get_pci_dev_path = "/sys/bus/pci/devices/"+pci_string+"/remove"
         self.write_file(get_pci_dev_path, "1", self.get_name())
-
-    def dpu_startup(self):
-        """Per DPU Startup API"""
-        print(f"{self.get_name()}: Startup")
-        self.dpu_power_on()
-        self.dpu_pci_scan()
-        print(f"{self.get_name()}: Startup complete")
 
     def dpu_fw_upgrade(self, path):
         """Per DPU Firmware Upgrade API"""
