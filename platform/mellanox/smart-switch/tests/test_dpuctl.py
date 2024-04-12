@@ -232,13 +232,11 @@ class Testdpuctl:
         assert written_data[1]["file"].endswith(
                 f"{dpuctl_obj.get_name()}_perst_en")
         assert "0" == written_data[1]["data"]
-        assert written_data[2]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
-        assert "1" == written_data[2]["data"]
-        assert written_data[3]["file"].endswith(
+        assert written_data[2]["file"].endswith(
                 f"{dpuctl_obj.get_name()}_perst_en")
+        assert "1" == written_data[2]["data"]
+        assert written_data[3]["file"].endswith("rescan")
         assert "1" == written_data[3]["data"]
-        assert written_data[4]["file"].endswith("rescan")
-        assert "1" == written_data[4]["data"]
         assert mock_inotify.call_args.args[0].endswith(
                 f"{dpuctl_obj.get_name()}_ready")
         dpuctl_obj.write_file = existing_wr_file
