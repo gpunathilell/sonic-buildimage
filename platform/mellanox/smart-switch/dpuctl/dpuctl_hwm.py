@@ -66,7 +66,6 @@ class DpuCtlPlat():
 
     def dpu_go_down(self):
         """Per DPU going down API"""
-        self.write_file(self.set_go_down_path, "1", self.get_name())
         get_shtdn_ready_path = os.path.join(EVENT_BASE,
                                             f"dpu{self.index}_shtdn_ready")
         try:
@@ -86,6 +85,7 @@ class DpuCtlPlat():
         if forced:
             self.write_file(self.set_pwr_f_path, "1", self.get_name())
         else:
+            self.write_file(self.set_go_down_path, "1", self.get_name())
             self.dpu_go_down()
             self.write_file(self.set_pwr_path, "1", self.get_name())
             print(f"{self.get_name()}: Power Off complete")
@@ -168,6 +168,7 @@ class DpuCtlPlat():
         print(f"{self.get_name()}: Reboot")
         self.dpu_reboot_prep()
         self.dpu_pci_remove()
+        self.write_file(self.set_go_down_path, "1", self.get_name())
         self.dpu_go_down()
         self.write_file(self.set_go_down_path, "0", self.get_name())
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
