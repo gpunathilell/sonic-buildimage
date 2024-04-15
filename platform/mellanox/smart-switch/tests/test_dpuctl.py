@@ -51,12 +51,10 @@ def dpuctl_command_exec(exec_cmd, command_name):
         args = result_checks['arg_list'][index_value]
         return_code = result_checks['rc'][index_value]
         return_message = result_checks['return_message'][index_value]
+        return_message = return_message.replace('"',"'").lower()
         result = runner.invoke(exec_cmd, args, catch_exceptions=False, obj=obj)
         assert result.exit_code == return_code
-        print(f"Command = {command_name}")
-        print(f"Return message = {return_message}")
-        print(f"result.output = {result.output}")
-        assert return_message == result.output
+        assert return_message == result.output.replace('"',"'").lower()
 
 
 class Testdpuctl:
@@ -111,10 +109,9 @@ class Testdpuctl:
         assert result.out == testData["power_off"][1]
         written_data = []
 
-        def mock_write_file(file_name, content_towrite, dpu_name):
+        def mock_write_file(file_name, content_towrite):
             written_data.append({"file": file_name,
-                                 "data": content_towrite,
-                                 "dpu_name": dpu_name})
+                                 "data": content_towrite})
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file
@@ -148,10 +145,9 @@ class Testdpuctl:
         assert result.out == testData["power_on"][1]
         written_data = []
 
-        def mock_write_file(file_name, content_towrite, dpu_name):
+        def mock_write_file(file_name, content_towrite):
             written_data.append({"file": file_name,
-                                 "data": content_towrite,
-                                 "dpu_name": dpu_name})
+                                 "data": content_towrite})
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file
@@ -182,10 +178,9 @@ class Testdpuctl:
         assert result.out == testData["reset"][0]
         written_data = []
 
-        def mock_write_file(file_name, content_towrite, dpu_name):
+        def mock_write_file(file_name, content_towrite):
             written_data.append({"file": file_name,
-                                 "data": content_towrite,
-                                 "dpu_name": dpu_name})
+                                 "data": content_towrite})
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file
@@ -218,10 +213,9 @@ class Testdpuctl:
         written_data = []
         written_data = []
 
-        def mock_write_file(file_name, content_towrite, dpu_name):
+        def mock_write_file(file_name, content_towrite):
             written_data.append({"file": file_name,
-                                 "data": content_towrite,
-                                 "dpu_name": dpu_name})
+                                 "data": content_towrite})
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file

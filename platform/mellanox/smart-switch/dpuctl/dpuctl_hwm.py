@@ -1,5 +1,6 @@
 """Class Implementation for per DPU functionality"""
 import os.path
+import time
 
 try:
     from .inotify_helper import InotifyHelper
@@ -49,15 +50,15 @@ class DpuCtlPlat():
         self.set_dpu_perst_en_path = os.path.join(SYSTEM_BASE,
                                                   f"dpu{self.index}_perst_en")
 
-    def write_file(self, file_name, content_towrite, dpu_name):
+    def write_file(self, file_name, content_towrite):
         """Write given value to file only if file exists"""
         try:
             with DataWriter(file_name) as file_obj:
                 file_obj.write(content_towrite)
-        except (ValueError, IOError, PermissionError) as file_write_exc:
-            logger.log_error(f'{dpu_name}:Failed to write'
+        except (ValueError, IOError, PermissionError,FileNotFoundError) as file_write_exc:
+            logger.log_error(f'{self.get_name()}:Failed to write'
                              f'{content_towrite} to file {file_name}')
-            raise type(file_write_exc)(f"{dpu_name}:{str(file_write_exc)}")
+            raise type(file_write_exc)(f"{self.get_name()}:{str(file_write_exc)}")
         return True
 
     def get_name(self):
@@ -83,11 +84,11 @@ class DpuCtlPlat():
         """Per DPU Power off API"""
         print(f"{self.get_name()}: Power off forced={forced}")
         if forced:
-            self.write_file(self.set_pwr_f_path, "1", self.get_name())
+            self.write_file(self.set_pwr_f_path, "1")
         else:
-            self.write_file(self.set_go_down_path, "1", self.get_name())
+            self.write_file(self.set_go_down_path, "1")
             self.dpu_go_down()
-            self.write_file(self.set_pwr_path, "1", self.get_name())
+            self.write_file(self.set_pwr_path, "1")
             print(f"{self.get_name()}: Power Off complete")
 
     def dpu_power_on(self, forced=False, count=4):
@@ -96,14 +97,15 @@ class DpuCtlPlat():
             print(f"{self.get_name()}: Failed! Retry {4-count}..")
         print(f"{self.get_name()}: Power on forced={forced}")
         if forced:
-            self.write_file(self.set_pwr_f_path, "0", self.get_name())
+            self.write_file(self.set_pwr_f_path, "0")
         else:
-            self.write_file(self.set_pwr_path, "0", self.get_name())
+            self.write_file(self.set_pwr_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
             if forced:
                 if count > 1:
+                    time.sleep(1)
                     self.dpu_power_off(forced=True)
                     self.dpu_power_on(forced=True, count=count-1)
                 else:
@@ -135,7 +137,7 @@ class DpuCtlPlat():
     def dpu_pci_scan(self):
         """PCI Scan API"""
         set_pci_scan = "/sys/bus/pci/rescan"
-        self.write_file(set_pci_scan, "1", self.get_name())
+        self.write_file(set_pci_scan, "1")
 
     def dpu_pci_remove(self):
         """Per DPU PCI remove API"""
@@ -144,7 +146,7 @@ class DpuCtlPlat():
         pci_string = utils.read_str_from_file(get_dpu_pci_path,
                                               raise_exception=True)
         get_pci_dev_path = "/sys/bus/pci/devices/"+pci_string+"/remove"
-        self.write_file(get_pci_dev_path, "1", self.get_name())
+        self.write_file(get_pci_dev_path, "1")
 
     def dpu_fw_upgrade(self, path):
         """Per DPU Firmware Upgrade API"""
@@ -152,9 +154,9 @@ class DpuCtlPlat():
         self.dpu_burn_fw(path)
         self.dpu_reboot_prep()
         self.dpu_pci_remove()
-        self.write_file(self.set_dpu_perst_en_path, "0", self.get_name())
+        self.write_file(self.set_dpu_perst_en_path, "0")
         self.dpu_go_down()
-        self.write_file(self.set_dpu_perst_en_path, "1", self.get_name())
+        self.write_file(self.set_dpu_perst_en_path, "1")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
@@ -168,9 +170,9 @@ class DpuCtlPlat():
         print(f"{self.get_name()}: Reboot")
         self.dpu_reboot_prep()
         self.dpu_pci_remove()
-        self.write_file(self.set_go_down_path, "1", self.get_name())
+        self.write_file(self.set_go_down_path, "1")
         self.dpu_go_down()
-        self.write_file(self.set_go_down_path, "0", self.get_name())
+        self.write_file(self.set_go_down_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
