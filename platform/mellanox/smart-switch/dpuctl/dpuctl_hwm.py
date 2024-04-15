@@ -55,10 +55,14 @@ class DpuCtlPlat():
         try:
             with DataWriter(file_name) as file_obj:
                 file_obj.write(content_towrite)
-        except (ValueError, IOError, PermissionError,FileNotFoundError) as file_write_exc:
+        except (ValueError,
+                IOError,
+                PermissionError,
+                FileNotFoundError) as file_write_exc:
             logger.log_error(f'{self.get_name()}:Failed to write'
                              f'{content_towrite} to file {file_name}')
-            raise type(file_write_exc)(f"{self.get_name()}:{str(file_write_exc)}")
+            raise type(file_write_exc)(
+                f"{self.get_name()}:{str(file_write_exc)}")
         return True
 
     def get_name(self):

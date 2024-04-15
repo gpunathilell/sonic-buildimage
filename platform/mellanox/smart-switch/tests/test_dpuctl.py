@@ -51,10 +51,10 @@ def dpuctl_command_exec(exec_cmd, command_name):
         args = result_checks['arg_list'][index_value]
         return_code = result_checks['rc'][index_value]
         return_message = result_checks['return_message'][index_value]
-        return_message = return_message.replace('"',"'").lower()
+        return_message = return_message.replace('"', "'").lower()
         result = runner.invoke(exec_cmd, args, catch_exceptions=False, obj=obj)
         assert result.exit_code == return_code
-        assert return_message == result.output.replace('"',"'").lower()
+        assert return_message == result.output.replace('"', "'").lower()
 
 
 class Testdpuctl:
