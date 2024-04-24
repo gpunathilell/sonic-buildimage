@@ -16,7 +16,7 @@
 #
 # ssd update tool
 
-MLNX_SONIC_BFB_INSTALL = sonic_bfb_installer
+MLNX_SONIC_BFB_INSTALL = sonic-bfb-installer
 $(MLNX_SONIC_BFB_INSTALL)_PATH = $(PLATFORM_PATH)/
 
 MLNX_BFB_INSTALL = bfb-install
