@@ -1034,7 +1034,7 @@ class ModularChassis(Chassis):
 
 class SmartSwitchChassis(Chassis):
     def __init__(self):
-        super(ModularChassis, self).__init__()
+        super(SmartSwitchChassis, self).__init__()
         self.module_initialized_count = 0
         self.initialize_modules()
 
