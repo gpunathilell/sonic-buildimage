@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES.
 # Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+import subprocess
 import redis
 import threading
 from sonic_platform_base.module_base import ModuleBase
 from sonic_py_common.logger import Logger
+from smart_switch.dpuctl.dpuctl_hwm import DpuCtlPlat
 
 from . import utils
 from .device_data import DeviceDataManager
 from .vpd_parser import VpdParser
+from swsscommon.swsscommon import SonicV2Connector
 
 # Global logger class instance
 logger = Logger()
@@ -247,3 +249,197 @@ class Module(ModuleBase):
         with self.lock:
             self.initialize_single_sfp(index)
             return super(Module, self).get_sfp(index)
+
+
+class DpuModule(ModuleBase):
+    CONFIG_DB = 4
+    config_db = SonicV2Connector()
+    config_db.connect(config_db.CONFIG_DB)
+
+    def __init__(self, dpu_id):
+        super(DpuModule, self).__init__()
+        self.dpu_id = dpu_id
+        self.dpuctl_obj = DpuCtlPlat(dpu_id - 1)
+        self.fault_state = False
+        self.vpd_parser = VpdParser('/var/run/hw-management/eeprom/vpd_data', True, self.dpu_id)
+
+    def get_base_mac(self):
+        """
+        Retrieves the base MAC address for the module
+
+        Returns:
+            A string containing the MAC address in the format
+            'XX:XX:XX:XX:XX:XX'
+        """
+        raise self.vpd_parser.get_dpu_base_mac()
+
+    def reboot(self, reboot_type):
+        """
+        Request to reboot the module
+
+        Args:
+            reboot_type: A string, the type of reboot requested from one of the
+            predefined reboot types: MODULE_REBOOT_DEFAULT, MODULE_REBOOT_CPU_COMPLEX,
+            or MODULE_REBOOT_FPGA_COMPLEX
+
+        Returns:
+            bool: True if the request has been issued successfully, False if not
+        """
+        # TODO: To change dpuctl implementation to return True or False based on Success
+        if reboot_type == ModuleBase.MODULE_REBOOT_DEFAULT:
+            return self.dpuctl_obj.dpu_reboot()
+        return False
+
+    def set_admin_state(self, up):
+        """
+        Request to keep the card in administratively up/down state.
+        The down state will power down the module and the status should show
+        MODULE_STATUS_OFFLINE.
+        The up state will take the module to MODULE_STATUS_FAULT or
+        MODULE_STATUS_ONLINE states.
+
+        Args:
+            up: A boolean, True to set the admin-state to UP. False to set the
+            admin-state to DOWN.
+
+        Returns:
+            bool: True if the request has been issued successfully, False if not
+        """
+        # TODO: To change dpuctl implementation to return True or False based on Success
+        if up:
+            self.fault_state = not self.dpuctl_obj.dpu_power_on()
+        else:
+            self.dpuctl_obj.dpu_power_off()
+            return True
+        return self.fault_state
+
+    def get_type(self):
+        """
+        Retrieves the type of the module.
+
+        Returns:
+            A string, the module-type from one of the predefined types:
+            MODULE_TYPE_SUPERVISOR, MODULE_TYPE_LINE or MODULE_TYPE_FABRIC
+            or MODULE_TYPE_DPU or MODULE_TYPE_SWITCH
+        """
+        return ModuleBase.MODULE_TYPE_DPU
+
+    def get_name(self):
+        """
+        Retrieves the name of the module prefixed by SUPERVISOR, LINE-CARD,
+        FABRIC-CARD, SWITCH, DPU0, DPUX
+
+        Returns:
+            A string, the module name prefixed by one of MODULE_TYPE_SUPERVISOR,
+            MODULE_TYPE_LINE or MODULE_TYPE_FABRIC or MODULE_TYPE_DPU or
+            MODULE_TYPE_SWITCH and followed by a 0-based index.
+
+            Ex. A Chassis having 1 supervisor, 4 line-cards and 6 fabric-cards
+            can provide names SUPERVISOR0, LINE-CARD0 to LINE-CARD3,
+            FABRIC-CARD0 to FABRIC-CARD5.
+            A SmartSwitch having 4 DPUs and 1 Switch can provide names DPU0 to
+            DPU3 and SWITCH
+        """
+        return f'DPU{self.dpu_id}'
+
+    def get_description(self):
+        """
+        Retrieves the platform vendor's product description of the module
+
+        Returns:
+            A string, providing the vendor's product description of the module.
+        """
+        return "NVIDIA BlueField-3 DPU"
+
+    def get_oper_status(self):
+        if self.fault_state:
+            return ModuleBase.MODULE_STATUS_FAULT
+        if utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}ready') == 1:
+            return ModuleBase.MODULE_STATUS_ONLINE
+        elif utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}_shtdn_ready') == 1:
+            return ModuleBase.MODULE_STATUS_OFFLINE
+
+    ##############################################
+    # SmartSwitch methods
+    ##############################################
+
+    def get_dpu_id(self):
+        """
+        Retrieves the DPU ID. Returns None for non-smartswitch chassis.
+        Returns:
+            An integer, indicating the DPU ID. DPU0 returns 1, DPUX returns X+1
+            Returns '0' on switch module
+        """
+        return self.dpu_id
+
+    def get_reboot_cause(self):
+        """
+        Retrieves the cause of the previous reboot of the DPU module
+        Returns:
+            A tuple (string, string) where the first element is a string
+            containing the cause of the previous reboot. This string must
+            be one of the predefined strings in this class. If the first
+            string is "REBOOT_CAUSE_HARDWARE_OTHER", the second string can be
+            used to pass a description of the reboot cause.
+            Some more causes are appended to the existing list to handle other
+            modules such as DPUs.
+            Ex: REBOOT_CAUSE_POWER_LOSS, REBOOT_CAUSE_HOST_RESET_DPU,
+            REBOOT_CAUSE_HOST_POWERCYCLED_DPU, REBOOT_CAUSE_SW_THERMAL,
+            REBOOT_CAUSE_DPU_SELF_REBOOT
+        """
+        if utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_from_main_board') == 1:
+            return self.REBOOT_CAUSE_HOST_RESET_DPU, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_dpu_thermal') == 1:
+            return self.REBOOT_CAUSE_SW_THERMAL, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_aux_pwr_or_reload') == 1:
+            return self.REBOOT_CAUSE_POWER_LOSS, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_pwr_off') == 1:
+            return self.REBOOT_CAUSE_DPU_SELF_REBOOT, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/tpm_rst') == 1:
+            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/perst_rst') == 1:
+            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/phy_rst') == 1:
+            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/usbphy_rst') == 1:
+            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'
+        else:
+            return self.REBOOT_CAUSE_NON_HARDWARE, ''
+
+    ##############################################
+    # Midplane methods for modular chassis
+    ##############################################
+    def get_midplane_ip(self):
+        """
+        Retrieves the midplane IP-address of the module in a modular chassis
+        When called from the Supervisor, the module could represent the
+        line-card and return the midplane IP-address of the line-card.
+        When called from the line-card, the module will represent the
+        Supervisor and return its midplane IP-address.
+        When called from the DPU, returns the midplane IP-address of the dpu-card.
+        When called from the Switch returns the midplane IP-address of Switch.
+
+        Returns:
+            A string, the IP-address of the module reachable over the midplane
+
+        """
+        key = "DHCP_SERVER_IPV4_PORT|" + "bridge-midplane" + "|" + self.get_name().lower()
+        data_dict = DpuModule.config_db.get_all(DpuModule.config_db.CONFIG_DB, key)
+        return data_dict["ips"]
+
+    def is_midplane_reachable(self):
+        """
+        Retrieves the reachability status of the module from the Supervisor or
+        of the Supervisor from the module via the midplane of the modular chassis
+
+        Returns:
+            A bool value, should return True if module is reachable via midplane
+        """
+        command = ['ping', '-c', '1', '-W', '1', self.get_midplane_ip()]
+        return_value = False
+        try:
+            return_value = subprocess.call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+        except subprocess.CalledProcessError:
+            logger.log_error("Failed to obtain check midplane reachability")
+            return False
+        return return_value

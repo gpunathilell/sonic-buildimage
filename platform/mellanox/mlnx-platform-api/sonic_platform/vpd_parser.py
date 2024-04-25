@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES.
 # Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,10 +28,12 @@ MFR_VPD_FIELD = "MFR_NAME"
 
 
 class VpdParser:
-    def __init__(self, file_path):
+    def __init__(self, file_path, smart_switch_data=False, dpu_id=-1):
         self.vpd_data = {}
         self.vpd_file = file_path
         self.vpd_file_last_mtime = None
+        self.smart_switch_data = smart_switch_data
+        self.dpu_id = dpu_id
 
     def _get_data(self):
         if not os.path.exists(self.vpd_file):
@@ -42,7 +44,10 @@ class VpdParser:
             mtime = os.stat(self.vpd_file).st_mtime
             if mtime != self.vpd_file_last_mtime:
                 self.vpd_file_last_mtime = mtime
-                self.vpd_data = utils.read_key_value_file(self.vpd_file)
+                if self.smart_switch_data:
+                    self.vpd_data = utils.read_key_value_file_first_delim(self.vpd_file)
+                else:
+                    self.vpd_data = utils.read_key_value_file(self.vpd_file)
             return True
         except Exception as e:
             self.vpd_data = {}
@@ -96,4 +101,16 @@ class VpdParser:
             return 'N/A'
         return self.vpd_data.get(key, 'N/A')
 
+    def get_dpu_data(self, key=None):
+        if not self.smart_switch_data or self.dpu_id == -1:
+            logger.log_warning("Fail to read vpd info: smart_switch_data and dpu_id is not initialized, key={} in VPD = {}".format(key, self.vpd_file))
+            return 'N/A'
+        if key:
+            return self.get_entry_value(key)
+        return {key: value for key, value in self.vpd_data.items() if key.startswith(f"DPU{self.dpu_id}")}
 
+    def get_dpu_base_mac(self):
+        return self.get_dpu_data(f"DPU{self.dpu_id}_BASE_MAC")
+
+    def get_dpu_system_eeprom_info(self):
+        return self.get_dpu_data()

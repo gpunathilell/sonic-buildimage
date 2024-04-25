@@ -1030,3 +1030,171 @@ class ModularChassis(Chassis):
             return None
 
         return module.get_sfp(sfp_index - 1)
+
+
+class SmartSwitchChassis(Chassis):
+    def __init__(self):
+        super(ModularChassis, self).__init__()
+        self.module_initialized_count = 0
+        self.initialize_modules()
+
+    def is_modular_chassis(self):
+        """
+        Retrieves whether the sonic instance is part of modular chassis
+
+        Returns:
+            A bool value, should return False by default or for fixed-platforms.
+            Should return True for supervisor-cards, line-cards etc running as part
+            of modular-chassis.
+            For SmartSwitch platforms this should return True even if they are
+            fixed-platforms, as they are treated like a modular chassis as the
+            DPU cards are treated like line-cards of a modular-chassis.
+        """
+        return True
+
+    ##############################################
+    # Module methods
+    ##############################################
+    def initialize_single_module(self, index):
+        count = self.get_num_modules()
+        if index < count:
+            if not self._module_list:
+                self._module_list = [None] * count
+
+            if not self._module_list[index]:
+                from .module import DpuModule
+                self._module_list[index] = DpuModule(index + 1)
+                self.module_initialized_count += 1
+
+    def initialize_modules(self):
+        if not self._module_list:
+            from .module import DpuModule
+            count = self.get_num_modules()
+            for index in range(1, count + 1):
+                self._module_list.append(DpuModule(index))
+            self.module_initialized_count = count
+        elif self.module_initialized_count != len(self._module_list):
+            from .module import DpuModule
+            for index in range(len(self._module_list)):
+                if self._module_list[index] is None:
+                    self._module_list[index] = DpuModule(index + 1)
+            self.module_initialized_count = len(self._module_list)
+
+    def get_num_modules(self):
+        """
+        Retrieves the number of modules available on this chassis
+        On a SmarSwitch chassis this includes the number of DPUs.
+
+        Returns:
+            An integer, the number of modules available on this chassis
+        """
+        return DeviceDataManager.get_dpu_count()
+
+    def get_all_modules(self):
+        """
+        Retrieves all modules available on this chassis. On a SmarSwitch
+        chassis this includes the number of DPUs.
+
+        Returns:
+            A list of objects derived from ModuleBase representing all
+            modules available on this chassis
+        """
+        self.initialize_modules()
+        return self._module_list
+
+    def get_module(self, index):
+        """
+        Retrieves module represented by (0-based) index <index>
+        On a SmartSwitch index:0 will fetch switch, index:1 will fetch
+        DPU0 and so on
+
+        Args:
+            index: An integer, the index (0-based) of the module to
+            retrieve
+
+        Returns:
+            An object dervied from ModuleBase representing the specified
+            module
+        """
+        self.initialize_single_module(index)
+        return super(SmartSwitchChassis, self).get_module(index)
+
+    @utils.default_return(-1)
+    def get_module_index(self, module_name):
+        """
+        Retrieves module index from the module name
+
+        Args:
+            module_name: A string, prefixed by SUPERVISOR, LINE-CARD or FABRIC-CARD
+            Ex. SUPERVISOR0, LINE-CARD1, FABRIC-CARD5
+            SmartSwitch Example: SWITCH, DPU1, DPU2 ... DPUX
+
+        Returns:
+            An integer, the index of the ModuleBase object in the module_list
+        """
+        # TODO: Confirm whether Switch is module or not
+        return int(module_name[len('DPU'):]) - 1
+
+    ##############################################
+    # SmartSwitch methods
+    ##############################################
+
+    def get_dpu_id(self, name):
+        """
+        Retrieves the DPU ID for the given dpu-module name.
+        Returns None for non-smartswitch chassis.
+        Returns:
+            An integer, indicating the DPU ID Ex: name:DPU0 return value 1,
+            name:DPU1 return value 2, name:DPUX return value X+1
+        """
+        return self.get_module_index(name)
+
+    def is_smartswitch(self):
+        """
+        Retrieves whether the sonic instance is part of smartswitch
+        Returns:
+            Returns:True for SmartSwitch and False for other platforms
+        """
+        return True
+
+    def init_midplane_switch(self):
+        """
+        Initializes the midplane functionality of the modular chassis. For
+        example, any validation of midplane, populating any lookup tables etc
+        can be done here. The expectation is that the required kernel modules,
+        ip-address assignment etc are done before the pmon, database dockers
+        are up.
+
+        Returns:
+            A bool value, should return True if the midplane initialized
+            successfully.
+        """
+        return True
+
+    def get_module_dpu_data_port(self, index):
+        """
+        Retrieves the DPU data port NPU-DPU association represented for
+        the DPU index. Platforms that need to overwrite the platform.json
+        file will use this API. This is valid only on the Switch and not on DPUs
+        Args:
+        index: An integer, the index of the module to retrieve
+        Returns:
+            A string giving the NPU-DPU port association:
+            Ex: For index: 1 will return the dup0 port association which is
+            "Ethernet-BP0: Ethernet0" where the string left of ":" (Ethernet-BP0)
+            is the NPU port and the string right of ":" (Ethernet0) is the DPU port
+        """
+        return_string = ":"
+        try:
+            platform_data = DeviceDataManager.get_platform_json_data()
+            dpu_specific_dictionary = platform_data["DPUS"][f'dpu{index+1}']
+            for key, value in dpu_specific_dictionary.items():
+                if key.startswith("Ethernet"):
+                    return_string = f"{key}:{value}"
+        except Exception as e:
+            logger.log_error("Failed to obtain NPU-DPU Port Mapping: {}".format(repr(e)))
+            return_string = "N/A"
+        if return_string == ":":
+            logger.log_error("Failed to obtain NPU-DPU Port Mapping:"
+                             "Data Not present in PLatform.json")
+        return return_string

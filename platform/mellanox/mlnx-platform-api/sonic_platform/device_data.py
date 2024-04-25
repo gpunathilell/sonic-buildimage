@@ -228,6 +228,11 @@ class DeviceDataManager:
 
     @classmethod
     @utils.read_only_cache()
+    def get_dpu_count(cls):
+        return utils.read_int_from_file('/run/hw-management/config/dpu_num', log_func=None)
+
+    @classmethod
+    @utils.read_only_cache()
     def get_linecard_max_port_count(cls):
         platform_data = DEVICE_DATA.get(cls.get_platform_name(), None)
         if not platform_data:
@@ -257,6 +262,13 @@ class DeviceDataManager:
         return ComponentCPLD.get_component_list()
 
     @classmethod
+    def get_platform_json_data(cls):
+        from sonic_py_common import device_info
+        platform_path = device_info.get_path_to_platform_dir()
+        platform_json_path = os.path.join(platform_path, 'platform.json')
+        return utils.load_json_file(platform_json_path)
+
+    @classmethod
     @utils.read_only_cache()
     def is_independent_mode(cls):
         from sonic_py_common import device_info
@@ -264,7 +276,7 @@ class DeviceDataManager:
         sai_profile_file = os.path.join(hwsku_dir, 'sai.profile')
         data = utils.read_key_value_file(sai_profile_file, delimeter='=')
         return data.get('SAI_INDEPENDENT_MODULE_MODE') == '1'
-    
+
     @classmethod
     def wait_platform_ready(cls):
         """
