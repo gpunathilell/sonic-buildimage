@@ -33,6 +33,9 @@ setup(
     setup_requires= [
         'pytest-runner'
     ],
+     install_requires=[
+        'inotify',
+    ],
     tests_require = [
         'pytest',
         'mock>=2.0.0'

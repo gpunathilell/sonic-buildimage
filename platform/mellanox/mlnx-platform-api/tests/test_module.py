@@ -19,18 +19,22 @@ import os
 import sys
 if sys.version_info.major == 3:
     from unittest import mock
+    from mock import patch
 else:
     import mock
-
+    from mock import patch
+import sonic_platform.utils
+from swsscommon import swsscommon
 test_path = os.path.dirname(os.path.abspath(__file__))
 modules_path = os.path.dirname(test_path)
 sys.path.insert(0, modules_path)
+swsscommon.ConfigDBConnector = mock.MagicMock()
 
 import sonic_platform.chassis
 from sonic_platform import utils
 from sonic_platform.chassis import ModularChassis, SmartSwitchChassis
 from sonic_platform.device_data import DeviceDataManager
-from sonic_platform.module import Module, DpuModule
+from sonic_platform.module import Module
 from sonic_platform_base.module_base import ModuleBase
 
 
@@ -173,7 +177,10 @@ class TestModule:
         assert len(m._sfp_list) == 0
         assert len(m._thermal_list) == 0
 
+    @patch('swsscommon.swsscommon.ConfigDBConnector', mock.MagicMock())
+    @patch('swsscommon.swsscommon.ConfigDBConnector.connect', mock.MagicMock())
     def test_module_vpd(self):
+        from sonic_platform.module import DpuModule
         m = Module(1)
         m.vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd')
 
@@ -193,10 +200,15 @@ class TestModule:
         assert m.get_revision() == 'A3'
 
         dm = DpuModule(2)
-        dm.vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd')
+        dm.vpd_parser.vpd_file_last_mtime = None
+        dm.vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd_dpu')
+        print(dm.vpd_parser.vpd_file)
         assert dm.get_base_mac() == "90:0A:84:C6:00:B1"
 
+    @patch('swsscommon.swsscommon.ConfigDBConnector', mock.MagicMock())
+    @patch('swsscommon.swsscommon.ConfigDBConnector.connect', mock.MagicMock())
     def test_dpu_module(self):
+        from sonic_platform.module import DpuModule
         m = DpuModule(3)
         assert m.get_type() == ModuleBase.MODULE_TYPE_DPU
         assert m.get_name() == "DPU3"
@@ -220,8 +232,8 @@ class TestModule:
                 return 1
             else:
                 return 0
-        utils.read_int_from_file == mock_read_int_from_file
-        test_file_path = "dpu3_ready"
-        assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
-        test_file_path = "dpu3_shtdn_ready"
-        assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
+        with patch("sonic_platform.utils.read_int_from_file",wraps=mock_read_int_from_file) as mock_read:
+            test_file_path = "dpu3_ready"
+            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
+            test_file_path = "dpu3_shtdn_ready"
+            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE

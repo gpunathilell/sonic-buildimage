@@ -19,12 +19,12 @@ import redis
 import threading
 from sonic_platform_base.module_base import ModuleBase
 from sonic_py_common.logger import Logger
-from smart_switch.dpuctl.dpuctl_hwm import DpuCtlPlat
+from .dpuctl_hwm import DpuCtlPlat
+from swsscommon.swsscommon import ConfigDBConnector
 
 from . import utils
 from .device_data import DeviceDataManager
 from .vpd_parser import VpdParser
-from swsscommon.swsscommon import SonicV2Connector
 
 # Global logger class instance
 logger = Logger()
@@ -252,8 +252,8 @@ class Module(ModuleBase):
 
 
 class DpuModule(ModuleBase):
-    config_db = SonicV2Connector()
-    config_db.connect(config_db.CONFIG_DB)
+    config_db = ConfigDBConnector()
+    config_db.connect()
 
     def __init__(self, dpu_id):
         super(DpuModule, self).__init__()
@@ -270,7 +270,7 @@ class DpuModule(ModuleBase):
             A string containing the MAC address in the format
             'XX:XX:XX:XX:XX:XX'
         """
-        raise self.vpd_parser.get_dpu_base_mac()
+        return self.vpd_parser.get_dpu_base_mac()
 
     def reboot(self, reboot_type):
         """
@@ -310,7 +310,7 @@ class DpuModule(ModuleBase):
         else:
             self.dpuctl_obj.dpu_power_off()
             return True
-        return self.fault_state
+        return not self.fault_state
 
     def get_type(self):
         """
@@ -353,7 +353,7 @@ class DpuModule(ModuleBase):
     def get_oper_status(self):
         if self.fault_state:
             return ModuleBase.MODULE_STATUS_FAULT
-        if utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}ready') == 1:
+        if utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}_ready') == 1:
             return ModuleBase.MODULE_STATUS_ONLINE
         elif utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}_shtdn_ready') == 1:
             return ModuleBase.MODULE_STATUS_OFFLINE

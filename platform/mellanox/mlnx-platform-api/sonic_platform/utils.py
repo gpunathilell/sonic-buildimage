@@ -139,12 +139,13 @@ def read_key_value_file_first_delim(file_path,
     """
 
     def converter(content):
-        _key_value_converter_first_delim(content, delimeter)
+        return _key_value_converter_first_delim(content, delimeter)
     return read_from_file(file_path=file_path,
                           target_type=converter,
                           default=default,
                           raise_exception=raise_exception,
                           log_func=log_func)
+     
 
 
 def read_key_value_file(file_path, default={}, raise_exception=False, log_func=logger.log_error, delimeter=':'):

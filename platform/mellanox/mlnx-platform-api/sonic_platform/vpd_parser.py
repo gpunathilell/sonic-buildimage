@@ -105,7 +105,7 @@ class VpdParser:
         if not self.smart_switch_data or self.dpu_id == -1:
             logger.log_warning("Fail to read vpd info: smart_switch_data and dpu_id is not initialized, key={} in VPD = {}".format(key, self.vpd_file))
             return 'N/A'
-        if key:
+        if key is not None:
             return self.get_entry_value(key)
         return {key: value for key, value in self.vpd_data.items() if key.startswith(f"DPU{self.dpu_id}")}
 
