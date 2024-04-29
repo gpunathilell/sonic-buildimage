@@ -28,9 +28,10 @@ sys.path.insert(0, modules_path)
 
 import sonic_platform.chassis
 from sonic_platform import utils
-from sonic_platform.chassis import ModularChassis
+from sonic_platform.chassis import ModularChassis, SmartSwitchChassis
 from sonic_platform.device_data import DeviceDataManager
-from sonic_platform.module import Module
+from sonic_platform.module import Module, DpuModule
+from sonic_platform_base.module_base import ModuleBase
 
 
 class TestModule:
@@ -38,11 +39,16 @@ class TestModule:
     def setup_class(cls):
         DeviceDataManager.get_linecard_sfp_count = mock.MagicMock(return_value=2)
         DeviceDataManager.get_linecard_count = mock.MagicMock(return_value=2)
+        DeviceDataManager.get_dpu_count = mock.MagicMock(return_value=4)
         sonic_platform.chassis.extract_RJ45_ports_index = mock.MagicMock(return_value=[])
 
     def test_chassis_get_num_sfp(self):
         chassis = ModularChassis()
         assert chassis.get_num_sfps() == 4
+
+    def test_chassis_get_num_modules(self):
+        chassis = SmartSwitchChassis()
+        assert chassis.get_num_modules() == 4
 
     def test_chassis_get_all_sfps(self):
         utils.read_int_from_file = mock.MagicMock(return_value=1)
@@ -185,3 +191,37 @@ class TestModule:
         assert m.get_model() == 'MTEF-PSF-AC-C'
         assert m.get_serial() == 'MT1946X07684'
         assert m.get_revision() == 'A3'
+
+        dm = DpuModule(2)
+        dm.vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd')
+        assert dm.get_base_mac() == "90:0A:84:C6:00:B1"
+
+    def test_dpu_module(self):
+        m = DpuModule(3)
+        assert m.get_type() == ModuleBase.MODULE_TYPE_DPU
+        assert m.get_name() == "DPU3"
+        assert m.get_description() == "NVIDIA BlueField-3 DPU"
+        assert m.get_dpu_id() == 3
+        m.dpuctl_obj.dpu_reboot = mock.MagicMock(return_value = True)
+        assert m.reboot(ModuleBase.MODULE_REBOOT_DEFAULT) == True
+        m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value = True)
+        assert m.set_admin_state(True) == True
+        assert m.fault_state == False
+        m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value = False)
+        assert m.set_admin_state(True) == False
+        assert m.fault_state == True
+        assert m.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT
+        m.dpuctl_obj.dpu_power_off = mock.MagicMock(return_value = True)
+        assert m.set_admin_state(False) == True
+        m.fault_state = False
+        test_file_path = ""
+        def mock_read_int_from_file(file_path, default=0, raise_exception=False, log_func=None):
+            if file_path.endswith(test_file_path):
+                return 1
+            else:
+                return 0
+        utils.read_int_from_file == mock_read_int_from_file
+        test_file_path = "dpu3_ready"
+        assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
+        test_file_path = "dpu3_shtdn_ready"
+        assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE

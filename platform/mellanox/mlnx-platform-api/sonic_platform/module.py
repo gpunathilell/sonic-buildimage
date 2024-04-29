@@ -252,7 +252,6 @@ class Module(ModuleBase):
 
 
 class DpuModule(ModuleBase):
-    CONFIG_DB = 4
     config_db = SonicV2Connector()
     config_db.connect(config_db.CONFIG_DB)
 

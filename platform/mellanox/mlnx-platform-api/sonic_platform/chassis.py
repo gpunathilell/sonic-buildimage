@@ -1187,10 +1187,7 @@ class SmartSwitchChassis(Chassis):
         return_string = ":"
         try:
             platform_data = DeviceDataManager.get_platform_json_data()
-            dpu_specific_dictionary = platform_data["DPUS"][f'dpu{index+1}']
-            for key, value in dpu_specific_dictionary.items():
-                if key.startswith("Ethernet"):
-                    return_string = f"{key}:{value}"
+            return_string = str(platform_data["DPUS"][f'dpu{index+1}']["interface"])
         except Exception as e:
             logger.log_error("Failed to obtain NPU-DPU Port Mapping: {}".format(repr(e)))
             return_string = "N/A"

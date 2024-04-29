@@ -33,7 +33,7 @@ sys.path.insert(0, modules_path)
 
 import sonic_platform.chassis
 from sonic_platform_base.sfp_base import SfpBase
-from sonic_platform.chassis import Chassis
+from sonic_platform.chassis import Chassis, SmartSwitchChassis
 from sonic_platform.device_data import DeviceDataManager
 
 sonic_platform.chassis.extract_RJ45_ports_index = mock.MagicMock(return_value=[])
@@ -372,3 +372,34 @@ class TestChassis:
         chassis = Chassis()
         content = chassis._parse_dmi(os.path.join(test_path, 'dmi_file'))
         assert content.get('Version') == 'A4'
+    
+    def test_smartswitch(self):
+        DeviceDataManager.get_dpu_count = mock.MagicMock(return_value=4)
+        chassis = SmartSwitchChassis()
+        assert chassis.is_modular_chassis() == True
+        assert chassis.is_smartswitch() == True
+        assert chassis.init_midplane_switch() == True
+        assert chassis.get_num_modules() == 4
+        module_list = chassis.get_all_modules()
+        assert len(module_list) == 4
+        pl_data = dict()
+        pl_data["DPUs"] =  [
+            {
+                "dpu0": {
+                            "interface": {"Ethernet224": "Ethernet0"}
+                }
+            },
+            {
+            "dpu1": {
+                        "interface": {"Ethernet232": "Ethernet0"}
+                },
+            },
+        {
+        "dpu2": {
+                    "interface": {"EthernetX": "EthernetY"}
+            }
+        }
+        ]
+        DeviceDataManager.get_platform_json_data = mock.MagicMock(return_value=pl_data)
+        chassis.get_module_dpu_data_port(0) == str({"Ethernet232": "Ethernet0"})
+        
