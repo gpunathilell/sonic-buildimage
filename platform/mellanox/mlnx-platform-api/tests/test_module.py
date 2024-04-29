@@ -94,7 +94,7 @@ class TestModule:
     def get_sfp(self):
         DeviceDataManager.get_linecard_sfp_count = mock.MagicMock(return_value=3)
         utils.read_int_from_file = mock.MagicMock(return_value=1)
-    
+
         # Test get_num_sfps, it should not create any SFP objects
         m = Module(1)
         assert m.get_num_sfps() == 3
@@ -144,12 +144,12 @@ class TestModule:
         m._sfp_list.append(1)
         m._thermal_list.append(1)
         m._get_seq_no = mock.MagicMock(return_value=0)
-        # both seq number and state no change, do not re-init module 
+        # both seq number and state no change, do not re-init module
         m._check_state()
         assert len(m._sfp_list) > 0
         assert len(m._thermal_list) > 0
 
-        # seq number changes, but state keeps deactivated, no need re-init module 
+        # seq number changes, but state keeps deactivated, no need re-init module
         m._get_seq_no = mock.MagicMock(return_value=1)
         m._check_state()
         assert len(m._sfp_list) > 0
@@ -214,25 +214,26 @@ class TestModule:
         assert m.get_name() == "DPU3"
         assert m.get_description() == "NVIDIA BlueField-3 DPU"
         assert m.get_dpu_id() == 3
-        m.dpuctl_obj.dpu_reboot = mock.MagicMock(return_value = True)
-        assert m.reboot(ModuleBase.MODULE_REBOOT_DEFAULT) == True
-        m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value = True)
-        assert m.set_admin_state(True) == True
-        assert m.fault_state == False
-        m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value = False)
-        assert m.set_admin_state(True) == False
-        assert m.fault_state == True
+        m.dpuctl_obj.dpu_reboot = mock.MagicMock(return_value=True)
+        assert m.reboot(ModuleBase.MODULE_REBOOT_DEFAULT) is True
+        m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value=True)
+        assert m.set_admin_state(True) is True
+        assert m.fault_state is False
+        m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value=False)
+        assert m.set_admin_state(True) is False
+        assert m.fault_state is True
         assert m.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT
-        m.dpuctl_obj.dpu_power_off = mock.MagicMock(return_value = True)
-        assert m.set_admin_state(False) == True
+        m.dpuctl_obj.dpu_power_off = mock.MagicMock(return_value=True)
+        assert m.set_admin_state(False) is True
         m.fault_state = False
         test_file_path = ""
+
         def mock_read_int_from_file(file_path, default=0, raise_exception=False, log_func=None):
             if file_path.endswith(test_file_path):
                 return 1
             else:
                 return 0
-        with patch("sonic_platform.utils.read_int_from_file",wraps=mock_read_int_from_file) as mock_read:
+        with patch("sonic_platform.utils.read_int_from_file", wraps=mock_read_int_from_file) as mock_read:
             test_file_path = "dpu3_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
             test_file_path = "dpu3_shtdn_ready"
