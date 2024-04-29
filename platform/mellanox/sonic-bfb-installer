@@ -1,4 +1,21 @@
 #!/bin/bash
+#
+# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 command_name="sonic-bfb-installer"
 usage(){
     echo "Syntax: $command_name -b|--bfb <BFB_Image_Path> --rshim|-r <rshim1,..rshimN> --verbose|-v --config|-c <Options> --help|h"
@@ -13,6 +30,7 @@ usage(){
 bfb_install_call(){
     #Example:sudo bfb-install -b <full path to image> -r rshim<id>
     local result_file=$(mktemp "/tmp/result_file.XXXXX")
+    trap "rm -f $result_file" EXIT
     local cmd="sudo ./bfb-install -b $2 -r $1 $appendix"
     echo "Installing bfb image on DPU connected to $1 using $cmd"
     local indicator="$1:"
@@ -26,7 +44,6 @@ bfb_install_call(){
     if [ $exit_status -ne 0 ] ||[ $verbose = true ]; then
         cat "$result_file"
     fi
-    rm -f "$result_file"
 }
 
 validate_rshim(){
@@ -46,7 +63,15 @@ validate_rshim(){
     done
 }
 
+check_for_root(){
+    if [ "$EUID" -ne 0 ]
+        then echo "Please run the script in sudo mode"
+        exit
+    fi
+}
+
 main(){
+    check_for_root
     local config=
     while [ "$1" != "--" ]  && [ -n "$1" ]; do
         case $1 in
@@ -101,6 +126,7 @@ main(){
             validate_rshim $dev_names
         fi
     fi
+    trap 'pkill -P $$' SIGINT SIGTERM SIGHUP
     for i in "${dev_names[@]}"
     do
         :
