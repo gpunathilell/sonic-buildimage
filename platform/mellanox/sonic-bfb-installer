@@ -31,7 +31,7 @@ bfb_install_call(){
     #Example:sudo bfb-install -b <full path to image> -r rshim<id>
     local result_file=$(mktemp "/tmp/result_file.XXXXX")
     trap "rm -f $result_file" EXIT
-    local cmd="sudo bfb-install -b $2 -r $1 $appendix"
+    local cmd="timeout 300s ./bfb-install -b $2 -r $1 $appendix"
     echo "Installing bfb image on DPU connected to $1 using $cmd"
     local indicator="$1:"
     eval "$cmd" > "$result_file" 2>&1 > >(while IFS= read -r line; do echo "$indicator $line"; done > "$result_file")
@@ -69,6 +69,8 @@ check_for_root(){
         exit
     fi
 }
+
+
 
 main(){
     check_for_root
@@ -126,13 +128,19 @@ main(){
             validate_rshim $dev_names
         fi
     fi
-    trap 'pkill -P $$' SIGINT SIGTERM SIGHUP
+    trap 'kill_ch_procs' SIGINT SIGTERM SIGHUP
     for i in "${dev_names[@]}"
     do
         :
         bfb_install_call $i $bfb &
     done
     wait
+}
+
+kill_ch_procs(){
+    echo ""
+    echo "Installation Interrupted.. killing All child procs"
+    pkill -P $$
 }
 
 appendix=
