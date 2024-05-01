@@ -1036,6 +1036,7 @@ class SmartSwitchChassis(Chassis):
     def __init__(self):
         super(SmartSwitchChassis, self).__init__()
         self.module_initialized_count = 0
+        self.module_name_index_map = {}
         self.initialize_modules()
 
     def is_modular_chassis(self):
@@ -1064,21 +1065,13 @@ class SmartSwitchChassis(Chassis):
             if not self._module_list[index]:
                 from .module import DpuModule
                 self._module_list[index] = DpuModule(index + 1)
+                self.module_name_index_map[DpuModule.get_name()] = index
                 self.module_initialized_count += 1
 
     def initialize_modules(self):
-        if not self._module_list:
-            from .module import DpuModule
-            count = self.get_num_modules()
-            for index in range(1, count + 1):
-                self._module_list.append(DpuModule(index))
-            self.module_initialized_count = count
-        elif self.module_initialized_count != len(self._module_list):
-            from .module import DpuModule
-            for index in range(len(self._module_list)):
-                if self._module_list[index] is None:
-                    self._module_list[index] = DpuModule(index + 1)
-            self.module_initialized_count = len(self._module_list)
+        count = self.get_num_modules()
+        for index in range(count):
+            self.initialize_single_module(index=index)
 
     def get_num_modules(self):
         """
@@ -1119,7 +1112,6 @@ class SmartSwitchChassis(Chassis):
         self.initialize_single_module(index)
         return super(SmartSwitchChassis, self).get_module(index)
 
-    @utils.default_return(-1)
     def get_module_index(self, module_name):
         """
         Retrieves module index from the module name
@@ -1133,7 +1125,12 @@ class SmartSwitchChassis(Chassis):
             An integer, the index of the ModuleBase object in the module_list
         """
         # TODO: Confirm whether Switch is module or not
-        return int(module_name[len('DPU'):]) - 1
+        ret_val = -1
+        try:
+            ret_val = self.module_name_index_map[module_name]
+        except KeyError as e:
+            logger.log_error("Failed to obtain name to index mapping! Check module initialization {}".format(repr(e)))
+        return ret_val
 
     ##############################################
     # SmartSwitch methods
@@ -1193,5 +1190,5 @@ class SmartSwitchChassis(Chassis):
             return_string = "N/A"
         if return_string == ":":
             logger.log_error("Failed to obtain NPU-DPU Port Mapping:"
-                             "Data Not present in PLatform.json")
+                             "Data Not present in Platform.json")
         return return_string

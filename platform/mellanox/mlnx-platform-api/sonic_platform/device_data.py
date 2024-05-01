@@ -20,6 +20,7 @@ import os
 import time
 
 from . import utils
+from sonic_py_common.logger import Logger
 
 DEVICE_DATA = {
     'x86_64-mlnx_msn2700-r0': {
@@ -138,6 +139,8 @@ DEVICE_DATA = {
     }
 }
 
+# Global logger class instance
+logger = Logger()
 
 class DeviceDataManager:
     @classmethod
@@ -263,10 +266,15 @@ class DeviceDataManager:
 
     @classmethod
     def get_platform_json_data(cls):
-        from sonic_py_common import device_info
-        platform_path = device_info.get_path_to_platform_dir()
-        platform_json_path = os.path.join(platform_path, 'platform.json')
-        return utils.load_json_file(platform_json_path)
+        retval = {}
+        try:
+            from sonic_py_common import device_info
+            platform_path = device_info.get_path_to_platform_dir()
+            platform_json_path = os.path.join(platform_path, 'platform.json')
+            retval = utils.load_json_file(platform_json_path)
+        except TypeError as e:
+            logger.log_error("Failed to obtain Platform.json file data")
+        return retval
 
     @classmethod
     @utils.read_only_cache()
