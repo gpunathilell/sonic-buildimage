@@ -44,6 +44,7 @@ bfb_install_call(){
     if [ $exit_status -ne 0 ] ||[ $verbose = true ]; then
         cat "$result_file"
     fi
+    rm -f $result_file
 }
 
 validate_rshim(){
@@ -137,12 +138,25 @@ main(){
     wait
 }
 
+kill_all_descendant_procs() {
+    local pid="$1"
+    local self_kill="${2:-false}"
+    if children="$(pgrep -P "$pid")"; then
+        for child in $children; do
+            kill_all_descendant_procs "$child" true
+        done
+    fi
+    if [[ "$self_kill" == true ]]; then
+        kill -15 "$pid" > /dev/null 2>&1
+    fi
+}
+
+
 kill_ch_procs(){
     echo ""
     echo "Installation Interrupted.. killing All child procs"
-    pkill -P $$
+    kill_all_descendant_procs $$
 }
-
 appendix=
 verbose=false
 main "$@"
