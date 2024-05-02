@@ -1065,7 +1065,7 @@ class SmartSwitchChassis(Chassis):
             if not self._module_list[index]:
                 from .module import DpuModule
                 self._module_list[index] = DpuModule(index + 1)
-                self.module_name_index_map[DpuModule.get_name()] = index
+                self.module_name_index_map[self._module_list[index].get_name()] = index
                 self.module_initialized_count += 1
 
     def initialize_modules(self):
