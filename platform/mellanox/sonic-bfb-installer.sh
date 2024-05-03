@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-command_name="sonic-bfb-installer"
+command_name="sonic-bfb-installer.sh"
 usage(){
     echo "Syntax: $command_name -b|--bfb <BFB_Image_Path> --rshim|-r <rshim1,..rshimN> --verbose|-v --config|-c <Options> --help|h"
     echo "Arguments:"

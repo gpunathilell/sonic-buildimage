@@ -16,7 +16,7 @@
 #
 # Mellanox specific Tool for installing bfb image on all DPUs attached to SmartSwitch
 
-MLNX_SONIC_BFB_INSTALL = sonic-bfb-installer
+MLNX_SONIC_BFB_INSTALL = sonic-bfb-installer.sh
 $(MLNX_SONIC_BFB_INSTALL)_PATH = $(PLATFORM_PATH)/
 MLNX_BFB_FILES = $(MLNX_SONIC_BFB_INSTALL) 
 SONIC_COPY_FILES += $(MLNX_BFB_FILES)
