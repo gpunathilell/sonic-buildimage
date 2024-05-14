@@ -54,28 +54,25 @@ class DataWriter():
 class DpuCtlPlat():
     """Class for Per DPU API Call"""
     def __init__(self, dpu_index):
-        self.index = dpu_index + 1
+        self.index = dpu_index
         self._name = f"dpu{self.index}"
         self.set_go_down_path = os.path.join(SYSTEM_BASE,
-                                             f"dpu{self.index}_rst")
+                                             f"{self._name}_rst")
         self.set_pwr_path = os.path.join(SYSTEM_BASE,
-                                         f"dpu{self.index}_pwr")
+                                         f"{self._name}_pwr")
         self.set_pwr_f_path = os.path.join(SYSTEM_BASE,
-                                           f"dpu{self.index}_pwr_force")
+                                           f"{self._name}_pwr_force")
         self.get_dpu_rdy_path = os.path.join(EVENT_BASE,
-                                             f"dpu{self.index}_ready")
+                                             f"{self._name}_ready")
         self.set_dpu_perst_en_path = os.path.join(SYSTEM_BASE,
-                                                  f"dpu{self.index}_perst_en")
+                                                  f"{self._name}_perst_en")
 
     def write_file(self, file_name, content_towrite):
         """Write given value to file only if file exists"""
         try:
             with DataWriter(file_name) as file_obj:
                 file_obj.write(content_towrite)
-        except (ValueError,
-                IOError,
-                PermissionError,
-                FileNotFoundError) as file_write_exc:
+        except Exception as file_write_exc:
             logger.log_error(f'{self.get_name()}:Failed to write'
                              f'{content_towrite} to file {file_name}')
             raise type(file_write_exc)(
@@ -89,110 +86,67 @@ class DpuCtlPlat():
     def dpu_go_down(self):
         """Per DPU going down API"""
         get_shtdn_ready_path = os.path.join(EVENT_BASE,
-                                            f"dpu{self.index}_shtdn_ready")
+                                            f"{self.get_name()}_shtdn_ready")
         try:
             get_shtdn_inotify = InotifyHelper(get_shtdn_ready_path)
             dpu_shtdn_rdy = get_shtdn_inotify.add_watch(WAIT_FOR_SHTDN, 1)
         except (FileNotFoundError, PermissionError) as inotify_exc:
             raise type(inotify_exc)(f"{self.get_name()}:{str(inotify_exc)}")
         if dpu_shtdn_rdy is None:
-            print(f"{self.get_name()}: Going Down Unsuccessful")
+            logger.log_info(f"{self.get_name()}: Going Down Unsuccessful")
             self.dpu_power_off(forced=True)
-            self.dpu_power_on(forced=True)
             return
 
     def dpu_power_off(self, forced=False):
         """Per DPU Power off API"""
-        print(f"{self.get_name()}: Power off forced={forced}")
+        logger.log_info(f"{self.get_name()}: Power off forced={forced}")
         if forced:
             self.write_file(self.set_pwr_f_path, "1")
         else:
             self.write_file(self.set_go_down_path, "1")
             self.dpu_go_down()
             self.write_file(self.set_pwr_path, "1")
-        print(f"{self.get_name()}: Power Off complete")
+        logger.log_info(f"{self.get_name()}: Power Off complete")
 
-    def dpu_power_on(self, forced=False, count=4):
-        """Per DPU Power on API"""
+    def _power_on_force(self, count=4):
+        """Per DPU Power on with force private function"""
         if count < 4:
-            print(f"{self.get_name()}: Failed! Retry {4-count}..")
-        print(f"{self.get_name()}: Power on forced={forced}")
-        if forced:
-            self.write_file(self.set_pwr_f_path, "0")
-        else:
-            self.write_file(self.set_pwr_path, "0")
+            logger.log_info(f"{self.get_name()}: Failed Force Power on! Retry {4-count}..")
+        self.write_file(self.set_pwr_f_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
-            if forced:
-                if count > 1:
-                    time.sleep(1)
-                    self.dpu_power_off(forced=True)
-                    self.dpu_power_on(forced=True, count=count-1)
-                else:
-                    print(f"{self.get_name()}: Failed Force power on! Exiting")
-                    return False
+            if count > 1:
+                time.sleep(1)
+                self._power_on_force(count=count - 1)
             else:
-                self.dpu_power_off(forced=True)
-                self.dpu_power_on(forced=True)
-        else:
-            print(f"{self.get_name()}: Power on Successful!")
-            return True
+                logger.log_info(f"{self.get_name()}: Failed Force power on! Exiting")
+                return False
+        logger.log_info(f"{self.get_name()}: Force Power on Successful!")
+        return True
 
-    def dpu_reboot_prep(self):
-        """Per DPU Reboot API"""
-        # TODO: Shutdown SONiC on DPU -> SSH Connection -> Shutdown script
-
-    def dpu_burn_fw(self, path):
-        """Per DPU Firmware Update API"""
-        # TODO: Uncomment to install the bfb Image
-        """if not os.path.isfile(path):
-            raise FileNotFoundError(f"{self.get_name()}:File "
-                                    f"{self.file_name} does not exist!")
-        cmd = ["sonic_bfb_install" ,"-b" ,path,"-r","rshim"+str(self.index)]
-        try:
-            cmd_output = subprocess.check_output(cmd)
-        except subprocess.CalledProcessError as cmd_exc:
-            print("Installation failed! code",
-                  cmd_exc.returncode,
-                  cmd_exc.output)"""
-
-    def dpu_pci_scan(self):
-        """PCI Scan API"""
-        set_pci_scan = "/sys/bus/pci/rescan"
-        self.write_file(set_pci_scan, "1")
-
-    def dpu_pci_remove(self):
-        """Per DPU PCI remove API"""
-        get_dpu_pci_path = os.path.join(CONFIG_BASE,
-                                        f"dpu{self.index}_pci_bus_id")
-        pci_string = utils.read_str_from_file(get_dpu_pci_path,
-                                              raise_exception=True)
-        get_pci_dev_path = "/sys/bus/pci/devices/"+pci_string+"/remove"
-        self.write_file(get_pci_dev_path, "1")
-
-    def dpu_fw_upgrade(self, path):
-        """Per DPU Firmware Upgrade API"""
-        print(f"{self.get_name()}: FW upgrade")
-        self.dpu_burn_fw(path)
-        self.dpu_reboot_prep()
-        self.dpu_pci_remove()
-        self.write_file(self.set_dpu_perst_en_path, "0")
-        self.dpu_go_down()
-        self.write_file(self.set_dpu_perst_en_path, "1")
+    def _power_on(self):
+        """Per DPU Power on without force private function"""
+        self.write_file(self.set_pwr_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
-            self.dpu_power_off(forced=True)
-            self.dpu_power_on(forced=True)
-        self.dpu_pci_scan()
-        print(f"{self.get_name()}: FW upgrade complete")
+            logger.log_info(f"{self.get_name()}: Failed power on! Trying Force Power on")
+            return self.__power_on_force()
+        logger.log_info(f"{self.get_name()}:Power on Successful!")
+        return True
+
+    def dpu_power_on(self, forced=False):
+        """Per DPU Power on API"""
+        logger.log_info(f"{self.get_name()}: Power on with force = {forced}")
+        if forced:
+            return self._power_on_force()
+        else:
+            return self._power_on()
 
     def dpu_reboot(self):
         """Per DPU Reboot API"""
-        print(f"{self.get_name()}: Reboot")
-        self.dpu_reboot_prep()
-        self.dpu_pci_remove()
+        logger.log_info(f"{self.get_name()}: Reboot")
         self.write_file(self.set_go_down_path, "1")
         self.dpu_go_down()
         self.write_file(self.set_go_down_path, "0")
@@ -201,36 +155,4 @@ class DpuCtlPlat():
         if not dpu_rdy:
             self.dpu_power_off(forced=True)
             self.dpu_power_on(forced=True)
-        self.dpu_pci_scan()
-        print(f"{self.get_name()}: Reboot complete")
-
-def call_dpu_fw_upgrade(obj, path):
-    """Function to call object specific firmware update for each dpu"""
-    try:
-        obj.dpu_fw_upgrade(path)
-    except Exception as error:
-        print(f"An error occurred: {type(error).__name__} - {error}")
-
-
-def call_dpu_reset(obj):
-    """Function to call object specific Reset for each dpu"""
-    try:
-        obj.dpu_reboot()
-    except Exception as error:
-        print(f"An error occurred: {type(error).__name__} - {error}")
-
-
-def call_dpu_power_on(obj, force):
-    """Function to call object specific power on for each dpu"""
-    try:
-        obj.dpu_power_on(force)
-    except Exception as error:
-        print(f"An error occurred: {type(error).__name__} - {error}")
-
-
-def call_dpu_power_off(obj, force):
-    """Function to call object specific power off for each dpu"""
-    try:
-        obj.dpu_power_off(force)
-    except Exception as error:
-        print(f"An error occurred: {type(error).__name__} - {error}")
+        logger.log_info(f"{self.get_name()}: Reboot complete")

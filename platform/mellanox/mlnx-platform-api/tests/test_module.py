@@ -28,7 +28,6 @@ from swsscommon import swsscommon
 test_path = os.path.dirname(os.path.abspath(__file__))
 modules_path = os.path.dirname(test_path)
 sys.path.insert(0, modules_path)
-swsscommon.ConfigDBConnector = mock.MagicMock()
 
 import sonic_platform.chassis
 from sonic_platform import utils
@@ -238,3 +237,21 @@ class TestModule:
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
             test_file_path = "dpu3_shtdn_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
+            """test_file_path = "reset_from_main_board"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, '']
+            test_file_path = "reset_dpu_thermal"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_SW_THERMAL, '']
+            test_file_path = "reset_aux_pwr_or_reload"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_POWER_LOSS, '']
+            test_file_path = "reset_pwr_off"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, '']
+            test_file_path = "tpm_rst"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module']
+            test_file_path = "perst_rst"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC']
+            test_file_path = "reset_from_main_board"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset']
+            test_file_path = "reset_from_main_board"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset']
+            test_file_path = "None"
+            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, '']"""

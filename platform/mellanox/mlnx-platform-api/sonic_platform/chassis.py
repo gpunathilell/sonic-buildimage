@@ -1058,14 +1058,17 @@ class SmartSwitchChassis(Chassis):
     ##############################################
     def initialize_single_module(self, index):
         count = self.get_num_modules()
+        if index < 0:
+            raise AssertionError(f"Invalid index = {index} for module initialization with total module count = {count}")
         if index < count:
             if not self._module_list:
                 self._module_list = [None] * count
 
             if not self._module_list[index]:
                 from .module import DpuModule
-                self._module_list[index] = DpuModule(index + 1)
-                self.module_name_index_map[self._module_list[index].get_name()] = index
+                module = DpuModule(index + 1)  # Index + 1 is the DPU ID
+                self._module_list[index] = module
+                self.module_name_index_map[module.get_name()] = index
                 self.module_initialized_count += 1
 
     def initialize_modules(self):
@@ -1124,13 +1127,7 @@ class SmartSwitchChassis(Chassis):
         Returns:
             An integer, the index of the ModuleBase object in the module_list
         """
-        # TODO: Confirm whether Switch is module or not
-        ret_val = -1
-        try:
-            ret_val = self.module_name_index_map[module_name]
-        except KeyError as e:
-            logger.log_error("Failed to obtain name to index mapping! Check module initialization {}".format(repr(e)))
-        return ret_val
+        return self.module_name_index_map[module_name]
 
     ##############################################
     # SmartSwitch methods
@@ -1144,7 +1141,8 @@ class SmartSwitchChassis(Chassis):
             An integer, indicating the DPU ID Ex: name:DPU0 return value 1,
             name:DPU1 return value 2, name:DPUX return value X+1
         """
-        return self.get_module_index(name)
+        module = self.get_module(self.get_module_index(name))
+        return module.get_dpu_id()
 
     def is_smartswitch(self):
         """
@@ -1181,14 +1179,9 @@ class SmartSwitchChassis(Chassis):
             "Ethernet-BP0: Ethernet0" where the string left of ":" (Ethernet-BP0)
             is the NPU port and the string right of ":" (Ethernet0) is the DPU port
         """
-        return_string = ":"
-        try:
-            platform_data = DeviceDataManager.get_platform_json_data()
-            return_string = str(platform_data["DPUS"][f'dpu{index+1}']["interface"])
-        except Exception as e:
-            logger.log_error("Failed to obtain NPU-DPU Port Mapping: {}".format(repr(e)))
-            return_string = "N/A"
-        if return_string == ":":
-            logger.log_error("Failed to obtain NPU-DPU Port Mapping:"
-                             "Data Not present in Platform.json")
-        return return_string
+        platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
+        module = self._module_list[index]
+        module_name = module.get_name()
+        for dictionary in platform_dpus_data:
+            if module_name.lower() in dictionary:
+                return dictionary[module_name.lower()]["interface"]

@@ -36,7 +36,7 @@ class InotifyHelper():
         self.inotify_obj = inotify.adapters.Inotify()
         if not self.inotify_obj:
             logger.log_error("INOTIFY adapter error!")
-            raise AssertionError("INOTIFY is not present!")
+            raise RuntimeError("INOTIFY is not present!")
         if not os.path.exists(self.file_path):
             logger.log_error(f"{self.file_path} does not exist")
             raise FileNotFoundError(errno.ENOENT,

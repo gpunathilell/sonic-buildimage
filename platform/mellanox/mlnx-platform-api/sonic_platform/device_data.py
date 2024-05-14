@@ -20,7 +20,6 @@ import os
 import time
 
 from . import utils
-from sonic_py_common.logger import Logger
 
 DEVICE_DATA = {
     'x86_64-mlnx_msn2700-r0': {
@@ -139,9 +138,6 @@ DEVICE_DATA = {
     }
 }
 
-# Global logger class instance
-logger = Logger()
-
 class DeviceDataManager:
     @classmethod
     @utils.read_only_cache()
@@ -232,7 +228,10 @@ class DeviceDataManager:
     @classmethod
     @utils.read_only_cache()
     def get_dpu_count(cls):
-        return utils.read_int_from_file('/run/hw-management/config/dpu_num', log_func=None)
+        try:
+            return utils.read_int_from_file('/run/hw-management/config/dpu_num', log_func=None)
+        except FileNotFoundError:
+            return 0
 
     @classmethod
     @utils.read_only_cache()
@@ -265,16 +264,12 @@ class DeviceDataManager:
         return ComponentCPLD.get_component_list()
 
     @classmethod
-    def get_platform_json_data(cls):
-        retval = {}
-        try:
-            from sonic_py_common import device_info
-            platform_path = device_info.get_path_to_platform_dir()
-            platform_json_path = os.path.join(platform_path, 'platform.json')
-            retval = utils.load_json_file(platform_json_path)
-        except TypeError as e:
-            logger.log_error("Failed to obtain Platform.json file data")
-        return retval
+    def get_platform_dpus_data(cls):
+        from sonic_py_common import device_info
+        platform_path = device_info.get_path_to_platform_dir()
+        platform_json_path = os.path.join(platform_path, 'platform.json')
+        json_data = utils.load_json_file(platform_json_path)
+        return json_data.find('DPUS', {})
 
     @classmethod
     @utils.read_only_cache()

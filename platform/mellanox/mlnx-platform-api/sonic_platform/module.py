@@ -258,7 +258,7 @@ class DpuModule(ModuleBase):
     def __init__(self, dpu_id):
         super(DpuModule, self).__init__()
         self.dpu_id = dpu_id
-        self.dpuctl_obj = DpuCtlPlat(dpu_id - 1)
+        self.dpuctl_obj = DpuCtlPlat(dpu_id)
         self.fault_state = False
         self.vpd_parser = VpdParser('/var/run/hw-management/eeprom/vpd_data', True, self.dpu_id)
 
@@ -284,7 +284,6 @@ class DpuModule(ModuleBase):
         Returns:
             bool: True if the request has been issued successfully, False if not
         """
-        # TODO: To change dpuctl implementation to return True or False based on Success
         if reboot_type == ModuleBase.MODULE_REBOOT_DEFAULT:
             return self.dpuctl_obj.dpu_reboot()
         return False
@@ -304,7 +303,6 @@ class DpuModule(ModuleBase):
         Returns:
             bool: True if the request has been issued successfully, False if not
         """
-        # TODO: To change dpuctl implementation to return True or False based on Success
         if up:
             self.fault_state = not self.dpuctl_obj.dpu_power_on()
         else:
@@ -404,41 +402,3 @@ class DpuModule(ModuleBase):
             return self.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'
         else:
             return self.REBOOT_CAUSE_NON_HARDWARE, ''
-
-    ##############################################
-    # Midplane methods for modular chassis
-    ##############################################
-    def get_midplane_ip(self):
-        """
-        Retrieves the midplane IP-address of the module in a modular chassis
-        When called from the Supervisor, the module could represent the
-        line-card and return the midplane IP-address of the line-card.
-        When called from the line-card, the module will represent the
-        Supervisor and return its midplane IP-address.
-        When called from the DPU, returns the midplane IP-address of the dpu-card.
-        When called from the Switch returns the midplane IP-address of Switch.
-
-        Returns:
-            A string, the IP-address of the module reachable over the midplane
-
-        """
-        key = "DHCP_SERVER_IPV4_PORT|" + "bridge-midplane" + "|" + self.get_name().lower()
-        data_dict = DpuModule.config_db.get_all(DpuModule.config_db.CONFIG_DB, key)
-        return data_dict["ips"]
-
-    def is_midplane_reachable(self):
-        """
-        Retrieves the reachability status of the module from the Supervisor or
-        of the Supervisor from the module via the midplane of the modular chassis
-
-        Returns:
-            A bool value, should return True if module is reachable via midplane
-        """
-        command = ['ping', '-c', '1', '-W', '1', self.get_midplane_ip()]
-        return_value = False
-        try:
-            return_value = subprocess.call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
-        except subprocess.CalledProcessError:
-            logger.log_error("Failed to obtain check midplane reachability")
-            return False
-        return return_value

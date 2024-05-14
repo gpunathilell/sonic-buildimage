@@ -31,8 +31,7 @@ except ImportError as e:
 class Platform(PlatformBase):
     def __init__(self):
         PlatformBase.__init__(self)
-        platform_data = DeviceDataManager.get_platform_json_data()
-        if "DPUS" in platform_data:
+        if DeviceDataManager.get_dpu_count():
             self._chassis = SmartSwitchChassis()
         elif DeviceDataManager.get_linecard_count() == 0:
             self._chassis = Chassis()
