@@ -28,12 +28,11 @@ MFR_VPD_FIELD = "MFR_NAME"
 
 
 class VpdParser:
-    def __init__(self, file_path, smart_switch_data=False, dpu_id=-1):
+    def __init__(self, file_path, dpu_name=None):
         self.vpd_data = {}
         self.vpd_file = file_path
         self.vpd_file_last_mtime = None
-        self.smart_switch_data = smart_switch_data
-        self.dpu_id = dpu_id
+        self.dpu_name = dpu_name
 
     def _get_data(self):
         if not os.path.exists(self.vpd_file):
@@ -44,10 +43,7 @@ class VpdParser:
             mtime = os.stat(self.vpd_file).st_mtime
             if mtime != self.vpd_file_last_mtime:
                 self.vpd_file_last_mtime = mtime
-                if self.smart_switch_data:
-                    self.vpd_data = utils.read_key_value_file_first_delim(self.vpd_file)
-                else:
-                    self.vpd_data = utils.read_key_value_file(self.vpd_file)
+                self.vpd_data = utils.read_key_value_file(self.vpd_file)
             return True
         except Exception as e:
             self.vpd_data = {}
@@ -102,15 +98,20 @@ class VpdParser:
         return self.vpd_data.get(key, 'N/A')
 
     def get_dpu_data(self, key=None):
-        if not self.smart_switch_data or self.dpu_id == -1:
-            logger.log_warning("Fail to read vpd info: smart_switch_data and dpu_id is not initialized, key={} in VPD = {}".format(key, self.vpd_file))
+        
+        if self.dpu_name is None:
+            logger.log_warning("Fail to read vpd info: dpu_name is not initialized for key={} in VPD = {}".format(key, self.vpd_file))
             return 'N/A'
-        if key is not None:
-            return self.get_entry_value(key)
-        return {key: value for key, value in self.vpd_data.items() if key.startswith(f"DPU{self.dpu_id}")}
+        return self.get_entry_value(f"{self.dpu_name}_{key}")
 
     def get_dpu_base_mac(self):
-        return self.get_dpu_data(f"DPU{self.dpu_id}_BASE_MAC")
+        return self.get_dpu_data("BASE_MAC")
 
-    def get_dpu_system_eeprom_info(self):
-        return self.get_dpu_data()
+    def get_dpu_serial(self):
+        return self.get_dpu_data("SN")
+
+    def get_dpu_revision(self):
+        return self.get_dpu_data("REV")
+
+    def get_dpu_model(self):
+        return self.get_dpu_data("PN")

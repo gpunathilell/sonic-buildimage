@@ -105,47 +105,9 @@ def read_float_from_file(file_path, default=0.0, raise_exception=False, log_func
 def _key_value_converter(content, delimeter):
     ret = {}
     for line in content.splitlines():
-        k,v = line.split(delimeter)
-        ret[k.strip()] = v.strip()
-    return ret
-
-
-def _key_value_converter_first_delim(content, delimeter):
-    ret = {}
-    for line in content.splitlines():
         k, v = line.split(delimeter, 1)[0], line.split(delimeter, 1)[1]
         ret[k.strip()] = v.strip()
     return ret
-
-
-def read_key_value_file_first_delim(file_path,
-                                    default={},
-                                    raise_exception=False,
-                                    log_func=logger.log_error,
-                                    delimeter=':'):
-    """Read file content and parse the content to a dict. The file content should like:
-       key1:value1
-       key2:value2
-       Modified existing function to consider values
-       which contain the delimiter themselves, so that we can split based
-       on the first occurence of the delimiter
-
-    Args:
-        file_path (str): file path
-        default (dict, optional): default return value. Defaults to {}.
-        raise_exception (bool, optional): If exception should be raised or hidden.
-        Defaults to False.
-        log_func (optional): logger function.. Defaults to logger.log_error.
-    """
-
-    def converter(content):
-        return _key_value_converter_first_delim(content, delimeter)
-    return read_from_file(file_path=file_path,
-                          target_type=converter,
-                          default=default,
-                          raise_exception=raise_exception,
-                          log_func=log_func)
-     
 
 
 def read_key_value_file(file_path, default={}, raise_exception=False, log_func=logger.log_error, delimeter=':'):

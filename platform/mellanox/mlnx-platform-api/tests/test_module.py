@@ -23,6 +23,7 @@ if sys.version_info.major == 3:
 else:
     import mock
     from mock import patch
+import pytest
 import sonic_platform.utils
 from swsscommon import swsscommon
 test_path = os.path.dirname(os.path.abspath(__file__))
@@ -176,8 +177,6 @@ class TestModule:
         assert len(m._sfp_list) == 0
         assert len(m._thermal_list) == 0
 
-    @patch('swsscommon.swsscommon.ConfigDBConnector', mock.MagicMock())
-    @patch('swsscommon.swsscommon.ConfigDBConnector.connect', mock.MagicMock())
     def test_module_vpd(self):
         from sonic_platform.module import DpuModule
         m = Module(1)
@@ -197,15 +196,37 @@ class TestModule:
         assert m.get_model() == 'MTEF-PSF-AC-C'
         assert m.get_serial() == 'MT1946X07684'
         assert m.get_revision() == 'A3'
+        assert m.vpd_parser.get_dpu_base_mac() == 'N/A'
 
         dm = DpuModule(2)
         dm.vpd_parser.vpd_file_last_mtime = None
         dm.vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd_dpu')
-        print(dm.vpd_parser.vpd_file)
         assert dm.get_base_mac() == "90:0A:84:C6:00:B1"
+        assert dm.get_model() == "SN4280BF3DPU2"
+        assert dm.get_serial() == "MT4431X26022"
+        assert dm.get_revision() == "A0"
 
-    @patch('swsscommon.swsscommon.ConfigDBConnector', mock.MagicMock())
-    @patch('swsscommon.swsscommon.ConfigDBConnector.connect', mock.MagicMock())
+        dm.vpd_parser = None
+        with pytest.raises(AttributeError):
+            dm.get_base_mac()
+            dm.get_model()
+            dm.get_serial()
+            dm.get_revision()
+
+        dm = DpuModule(5)
+        dm.vpd_parser.vpd_file_last_mtime = None
+        dm.vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd_dpu')
+        assert dm.get_base_mac() == "N/A"
+        assert dm.get_model() == "N/A"
+        assert dm.get_serial() == "N/A"
+        assert dm.get_revision() == "N/A"
+
+        m.vpd_parser.vpd_file = 'does not exist'
+        assert dm.get_base_mac() == "N/A"
+        assert m.get_model() == 'N/A'
+        assert m.get_serial() == 'N/A'
+        assert m.get_revision() == 'N/A'
+
     def test_dpu_module(self):
         from sonic_platform.module import DpuModule
         m = DpuModule(3)
@@ -215,6 +236,7 @@ class TestModule:
         assert m.get_dpu_id() == 3
         m.dpuctl_obj.dpu_reboot = mock.MagicMock(return_value=True)
         assert m.reboot(ModuleBase.MODULE_REBOOT_DEFAULT) is True
+        assert m.reboot("None") is False
         m.dpuctl_obj.dpu_power_on = mock.MagicMock(return_value=True)
         assert m.set_admin_state(True) is True
         assert m.fault_state is False
@@ -237,21 +259,25 @@ class TestModule:
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
             test_file_path = "dpu3_shtdn_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
-            """test_file_path = "reset_from_main_board"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, '']
+            test_file_path = "dpu3_shtdn_ready"
+            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
+            test_file_path = "aaa"
+            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT
+            test_file_path = "reset_from_main_board"
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, '')
             test_file_path = "reset_dpu_thermal"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_SW_THERMAL, '']
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_SW_THERMAL, '')
             test_file_path = "reset_aux_pwr_or_reload"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_POWER_LOSS, '']
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_POWER_LOSS, '')
             test_file_path = "reset_pwr_off"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, '']
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, '')
             test_file_path = "tpm_rst"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module']
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module')
             test_file_path = "perst_rst"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC']
-            test_file_path = "reset_from_main_board"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset']
-            test_file_path = "reset_from_main_board"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset']
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC')
+            test_file_path = "phy_rst"
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset')
+            test_file_path = "usbphy_rst"
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset')
             test_file_path = "None"
-            assert m.get_reboot_cause() == [ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, '']"""
+            assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_NON_HARDWARE, '')

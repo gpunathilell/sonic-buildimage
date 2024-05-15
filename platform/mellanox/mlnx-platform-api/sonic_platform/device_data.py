@@ -228,10 +228,10 @@ class DeviceDataManager:
     @classmethod
     @utils.read_only_cache()
     def get_dpu_count(cls):
-        try:
-            return utils.read_int_from_file('/run/hw-management/config/dpu_num', log_func=None)
-        except FileNotFoundError:
+        dpu_data = cls.get_platform_dpus_data()
+        if not dpu_data:
             return 0
+        return len(dpu_data)
 
     @classmethod
     @utils.read_only_cache()
@@ -269,7 +269,7 @@ class DeviceDataManager:
         platform_path = device_info.get_path_to_platform_dir()
         platform_json_path = os.path.join(platform_path, 'platform.json')
         json_data = utils.load_json_file(platform_json_path)
-        return json_data.find('DPUS', {})
+        return json_data.find('DPUS', None)
 
     @classmethod
     @utils.read_only_cache()

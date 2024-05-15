@@ -22,6 +22,8 @@ import pytest
 
 from click.testing import CliRunner
 from sonic_platform.dpuctl_hwm import DpuCtlPlat
+import sonic_platform
+import mock
 
 if sys.version_info.major == 3:
     from unittest.mock import MagicMock, patch
@@ -37,8 +39,7 @@ def create_dpu_list():
     existing_dpu_list = ['dpu1', 'dpu2', 'dpu3', 'dpu4']
     dpuctl_list = []
     for dpu_name in existing_dpu_list:
-        index = int(dpu_name[-1])
-        dpuctl_list.append(DpuCtlPlat(index))
+        dpuctl_list.append(DpuCtlPlat(dpu_name))
     context = {
         "dpuctl_list": dpuctl_list,
     }
@@ -57,13 +58,13 @@ class TestDpuClass:
         os.environ["MLNX_PLATFORM_API_DPUCTL_UNIT_TESTING"] = "2"
 
     @patch('os.path.exists', MagicMock(return_value=True))
-    @patch('sonic_platform.inotify_helper.InotifyHelper.add_watch',
-           MagicMock(return_value=True))
+    @patch('sonic_platform.inotify_helper.InotifyHelper.add_watch')
     @patch('sonic_platform.inotify_helper.InotifyHelper.__init__')
-    def test_power_off(self, mock_inotify, capsys):
+    def test_power_off(self, mock_inotify, mock_add_watch):
         """Tests for Per DPU Power Off function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
+        mock_add_watch.return_value = True
         with pytest.raises(FileNotFoundError, match="/var/run/hw-management"
                            "/system/dpu1_pwr_force does not exist!"):
             dpuctl_obj.dpu_power_off(True)
@@ -78,28 +79,37 @@ class TestDpuClass:
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file
-        dpuctl_obj.dpu_power_off(True)
+        assert dpuctl_obj.dpu_power_off(True)
         assert written_data[0]["file"].endswith(
             f"{dpuctl_obj.get_name()}_pwr_force")
         assert "1" == written_data[0]["data"]
         written_data = []
-        dpuctl_obj.dpu_power_off(False)
+        assert dpuctl_obj.dpu_power_off(False)
         assert mock_inotify.call_args.args[0].endswith(
             f"{dpuctl_obj.get_name()}_shtdn_ready")
         assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
         assert "1" == written_data[0]["data"]
         assert written_data[1]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr")
         assert "1" == written_data[1]["data"]
+        written_data = []
+        mock_add_watch.return_value = None
+        assert dpuctl_obj.dpu_power_off(False)
+        assert mock_inotify.call_args.args[0].endswith(
+            f"{dpuctl_obj.get_name()}_shtdn_ready")
+        assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
+        assert "1" == written_data[0]["data"]
+        assert written_data[1]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "1" == written_data[1]["data"]
         dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
-    @patch('sonic_platform.inotify_helper.InotifyHelper.add_watch',
-           MagicMock(return_value=True))
+    @patch('sonic_platform.inotify_helper.InotifyHelper.add_watch')
     @patch('sonic_platform.inotify_helper.InotifyHelper.__init__')
-    def test_power_on(self, mock_inotify, capsys):
+    def test_power_on(self, mock_inotify, mock_add_watch):
         """Tests for Per DPU Power On function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
+        mock_add_watch.return_value = True
         with pytest.raises(FileNotFoundError, match="/var/run/hw-management"
                            "/system/dpu1_pwr_force does not exist!"):
             dpuctl_obj.dpu_power_on(True)
@@ -114,28 +124,47 @@ class TestDpuClass:
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file
-        dpuctl_obj.dpu_power_on(True)
+        assert dpuctl_obj.dpu_power_on(True)
         assert mock_inotify.call_args.args[0].endswith(
             f"{dpuctl_obj.get_name()}_ready")
         assert written_data[0]["file"].endswith(
             f"{dpuctl_obj.get_name()}_pwr_force")
         assert "0" == written_data[0]["data"]
         written_data = []
-        dpuctl_obj.dpu_power_on(False)
+        assert dpuctl_obj.dpu_power_on(False)
         assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr")
         assert "0" == written_data[0]["data"]
+        written_data = []
+        mock_add_watch.return_value = None
+        print("test2")
+        assert not dpuctl_obj.dpu_power_on(False)
+        print(written_data)
+        assert len(written_data) == 5
+        print(written_data)
+        assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr")
+        assert "0" == written_data[0]["data"]
+        assert written_data[1]["file"].endswith(
+            f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "0" == written_data[1]["data"]
+        assert written_data[2]["file"].endswith(
+            f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "0" == written_data[2]["data"]
+        assert written_data[3]["file"].endswith(
+            f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "0" == written_data[3]["data"]
+        assert written_data[4]["file"].endswith(
+            f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "0" == written_data[4]["data"]
         dpuctl_obj.write_file = existing_wr_file
 
     @patch('os.path.exists', MagicMock(return_value=True))
-    @patch('sonic_platform.utils.read_str_from_file',
-           MagicMock(return_value="dpu1_pciid"))
-    @patch('sonic_platform.inotify_helper.InotifyHelper.add_watch',
-           MagicMock(return_value=1))
+    @patch('sonic_platform.inotify_helper.InotifyHelper.add_watch')
     @patch('sonic_platform.inotify_helper.InotifyHelper.__init__')
-    def test_dpu_reset(self, mock_inotify, capsys):
+    def test_dpu_reset(self, mock_inotify,mock_add_watch):
         """Tests for Per DPU Reset function"""
         dpuctl_obj = obj["dpuctl_list"][0]
         mock_inotify.return_value = None
+        mock_add_watch.return_value = True
         with pytest.raises(FileNotFoundError, match="/var/run/hw-management"
                            "/system/dpu1_rst does not exist!"):
             dpuctl_obj.dpu_reboot()
@@ -147,13 +176,25 @@ class TestDpuClass:
             return True
         existing_wr_file = dpuctl_obj.write_file
         dpuctl_obj.write_file = mock_write_file
-        dpuctl_obj.dpu_reboot()
+        assert dpuctl_obj.dpu_reboot()
         assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
         assert "1" == written_data[0]["data"]
         assert written_data[1]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
         assert "0" == written_data[1]["data"]
         assert mock_inotify.call_args.args[0].endswith(
             f"{dpuctl_obj.get_name()}_ready")
+        mock_add_watch.return_value = None 
+        written_data = []
+        assert not dpuctl_obj.dpu_reboot()
+        assert len(written_data) == 7
+        assert written_data[0]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
+        assert "1" == written_data[0]["data"]
+        assert written_data[1]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "1" == written_data[1]["data"]
+        assert written_data[2]["file"].endswith(f"{dpuctl_obj.get_name()}_rst")
+        assert "0" == written_data[2]["data"]
+        assert written_data[3]["file"].endswith(f"{dpuctl_obj.get_name()}_pwr_force")
+        assert "0" == written_data[3]["data"]
         dpuctl_obj.write_file = existing_wr_file
 
     @classmethod

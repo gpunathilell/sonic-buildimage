@@ -53,9 +53,8 @@ class DataWriter():
 
 class DpuCtlPlat():
     """Class for Per DPU API Call"""
-    def __init__(self, dpu_index):
-        self.index = dpu_index
-        self._name = f"dpu{self.index}"
+    def __init__(self, dpu_name):
+        self._name = dpu_name
         self.set_go_down_path = os.path.join(SYSTEM_BASE,
                                              f"{self._name}_rst")
         self.set_pwr_path = os.path.join(SYSTEM_BASE,
@@ -95,18 +94,24 @@ class DpuCtlPlat():
         if dpu_shtdn_rdy is None:
             logger.log_info(f"{self.get_name()}: Going Down Unsuccessful")
             self.dpu_power_off(forced=True)
-            return
+            return None
+        return True
 
     def dpu_power_off(self, forced=False):
         """Per DPU Power off API"""
         logger.log_info(f"{self.get_name()}: Power off forced={forced}")
         if forced:
             self.write_file(self.set_pwr_f_path, "1")
-        else:
-            self.write_file(self.set_go_down_path, "1")
-            self.dpu_go_down()
-            self.write_file(self.set_pwr_path, "1")
+            logger.log_info(f"{self.get_name()}: Force Power Off complete")
+            return True
+        self.write_file(self.set_go_down_path, "1")
+        if not self.dpu_go_down(): 
+            """If go_down returns None, 
+            that means Force power off is executed, No need to power off"""
+            return True
+        self.write_file(self.set_pwr_path, "1")
         logger.log_info(f"{self.get_name()}: Power Off complete")
+        return True
 
     def _power_on_force(self, count=4):
         """Per DPU Power on with force private function"""
@@ -118,10 +123,9 @@ class DpuCtlPlat():
         if not dpu_rdy:
             if count > 1:
                 time.sleep(1)
-                self._power_on_force(count=count - 1)
-            else:
-                logger.log_info(f"{self.get_name()}: Failed Force power on! Exiting")
-                return False
+                return self._power_on_force(count=count - 1)
+            logger.log_info(f"{self.get_name()}: Failed Force power on! Exiting")
+            return False
         logger.log_info(f"{self.get_name()}: Force Power on Successful!")
         return True
 
@@ -130,9 +134,10 @@ class DpuCtlPlat():
         self.write_file(self.set_pwr_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
+        logger.log_info(f"Return value is {dpu_rdy}")
         if not dpu_rdy:
             logger.log_info(f"{self.get_name()}: Failed power on! Trying Force Power on")
-            return self.__power_on_force()
+            return self._power_on_force()
         logger.log_info(f"{self.get_name()}:Power on Successful!")
         return True
 
@@ -153,6 +158,6 @@ class DpuCtlPlat():
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
-            self.dpu_power_off(forced=True)
-            self.dpu_power_on(forced=True)
+            return self.dpu_power_on(forced=True)
         logger.log_info(f"{self.get_name()}: Reboot complete")
+        return True

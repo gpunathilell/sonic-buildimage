@@ -252,15 +252,14 @@ class Module(ModuleBase):
 
 
 class DpuModule(ModuleBase):
-    config_db = ConfigDBConnector()
-    config_db.connect()
 
     def __init__(self, dpu_id):
         super(DpuModule, self).__init__()
         self.dpu_id = dpu_id
-        self.dpuctl_obj = DpuCtlPlat(dpu_id)
+        self._name = f"DPU{self.dpu_id}"
+        self.dpuctl_obj = DpuCtlPlat(self._name.lower())
         self.fault_state = False
-        self.vpd_parser = VpdParser('/var/run/hw-management/eeprom/vpd_data', True, self.dpu_id)
+        self.vpd_parser = VpdParser('/var/run/hw-management/eeprom/vpd_data', self._name)
 
     def get_base_mac(self):
         """
@@ -271,6 +270,33 @@ class DpuModule(ModuleBase):
             'XX:XX:XX:XX:XX:XX'
         """
         return self.vpd_parser.get_dpu_base_mac()
+
+    def get_model(self):
+        """
+        Retrieves the model number (or part number) of the device
+
+        Returns:
+            string: Model/part number of device
+        """
+        return self.vpd_parser.get_dpu_model()
+
+    def get_serial(self):
+        """
+        Retrieves the serial number of the device
+
+        Returns:
+            string: Serial number of device
+        """
+        return self.vpd_parser.get_dpu_serial()
+
+    def get_revision(self):
+        """
+        Retrieves the hardware revision of the device
+
+        Returns:
+            string: Revision value of device
+        """
+        return self.vpd_parser.get_dpu_revision()
 
     def reboot(self, reboot_type):
         """
@@ -304,11 +330,10 @@ class DpuModule(ModuleBase):
             bool: True if the request has been issued successfully, False if not
         """
         if up:
-            self.fault_state = not self.dpuctl_obj.dpu_power_on()
-        else:
-            self.dpuctl_obj.dpu_power_off()
-            return True
-        return not self.fault_state
+            power_on_success = self.dpuctl_obj.dpu_power_on()
+            self.fault_state = not power_on_success
+            return power_on_success
+        return self.dpuctl_obj.dpu_power_off()
 
     def get_type(self):
         """
@@ -337,7 +362,7 @@ class DpuModule(ModuleBase):
             A SmartSwitch having 4 DPUs and 1 Switch can provide names DPU0 to
             DPU3 and SWITCH
         """
-        return f'DPU{self.dpu_id}'
+        return self._name
 
     def get_description(self):
         """
@@ -355,6 +380,7 @@ class DpuModule(ModuleBase):
             return ModuleBase.MODULE_STATUS_ONLINE
         elif utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}_shtdn_ready') == 1:
             return ModuleBase.MODULE_STATUS_OFFLINE
+        return ModuleBase.MODULE_STATUS_FAULT # If both ready and shtdn_ready are not set, return fault state
 
     ##############################################
     # SmartSwitch methods
@@ -384,21 +410,21 @@ class DpuModule(ModuleBase):
             REBOOT_CAUSE_HOST_POWERCYCLED_DPU, REBOOT_CAUSE_SW_THERMAL,
             REBOOT_CAUSE_DPU_SELF_REBOOT
         """
-        if utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_from_main_board') == 1:
-            return self.REBOOT_CAUSE_HOST_RESET_DPU, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_dpu_thermal') == 1:
-            return self.REBOOT_CAUSE_SW_THERMAL, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_aux_pwr_or_reload') == 1:
-            return self.REBOOT_CAUSE_POWER_LOSS, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/reset_pwr_off') == 1:
-            return self.REBOOT_CAUSE_DPU_SELF_REBOOT, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/tpm_rst') == 1:
-            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/perst_rst') == 1:
-            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/phy_rst') == 1:
-            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self.dpu_id}/system/usbphy_rst') == 1:
-            return self.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'
+        if utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_from_main_board') == 1:
+            return ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_dpu_thermal') == 1:
+            return ModuleBase.REBOOT_CAUSE_SW_THERMAL, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_aux_pwr_or_reload') == 1:
+            return ModuleBase.REBOOT_CAUSE_POWER_LOSS, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_pwr_off') == 1:
+            return ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, ''
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/tpm_rst') == 1:
+            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/perst_rst') == 1:
+            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/phy_rst') == 1:
+            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'
+        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/usbphy_rst') == 1:
+            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'
         else:
-            return self.REBOOT_CAUSE_NON_HARDWARE, ''
+            return ModuleBase.REBOOT_CAUSE_NON_HARDWARE, ''
