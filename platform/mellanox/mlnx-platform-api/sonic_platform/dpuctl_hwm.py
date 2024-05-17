@@ -86,6 +86,7 @@ class DpuCtlPlat():
         """Per DPU going down API"""
         get_shtdn_ready_path = os.path.join(EVENT_BASE,
                                             f"{self.get_name()}_shtdn_ready")
+        self.write_file(self.set_go_down_path, "1")
         try:
             get_shtdn_inotify = InotifyHelper(get_shtdn_ready_path)
             dpu_shtdn_rdy = get_shtdn_inotify.add_watch(WAIT_FOR_SHTDN, 1)
@@ -93,8 +94,7 @@ class DpuCtlPlat():
             raise type(inotify_exc)(f"{self.get_name()}:{str(inotify_exc)}")
         if dpu_shtdn_rdy is None:
             logger.log_info(f"{self.get_name()}: Going Down Unsuccessful")
-            self.dpu_power_off(forced=True)
-            return None
+            return False
         return True
 
     def dpu_power_off(self, forced=False):
@@ -104,11 +104,8 @@ class DpuCtlPlat():
             self.write_file(self.set_pwr_f_path, "1")
             logger.log_info(f"{self.get_name()}: Force Power Off complete")
             return True
-        self.write_file(self.set_go_down_path, "1")
-        if not self.dpu_go_down(): 
-            """If go_down returns None, 
-            that means Force power off is executed, No need to power off"""
-            return True
+        if not self.dpu_go_down():
+            return self.dpu_power_off(forced=True)
         self.write_file(self.set_pwr_path, "1")
         logger.log_info(f"{self.get_name()}: Power Off complete")
         return True
@@ -152,8 +149,8 @@ class DpuCtlPlat():
     def dpu_reboot(self):
         """Per DPU Reboot API"""
         logger.log_info(f"{self.get_name()}: Reboot")
-        self.write_file(self.set_go_down_path, "1")
-        self.dpu_go_down()
+        if not self.dpu_go_down():
+            self.dpu_power_off(forced=True)
         self.write_file(self.set_go_down_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)

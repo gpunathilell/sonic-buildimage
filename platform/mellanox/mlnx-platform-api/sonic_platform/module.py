@@ -20,11 +20,12 @@ import threading
 from sonic_platform_base.module_base import ModuleBase
 from sonic_py_common.logger import Logger
 from .dpuctl_hwm import DpuCtlPlat
-from swsscommon.swsscommon import ConfigDBConnector
+from ipaddress import ip_network
 
 from . import utils
 from .device_data import DeviceDataManager
 from .vpd_parser import VpdParser
+from .dpu_vpd_parser import DpuVpdParser
 
 # Global logger class instance
 logger = Logger()
@@ -259,7 +260,7 @@ class DpuModule(ModuleBase):
         self._name = f"DPU{self.dpu_id}"
         self.dpuctl_obj = DpuCtlPlat(self._name.lower())
         self.fault_state = False
-        self.vpd_parser = VpdParser('/var/run/hw-management/eeprom/vpd_data', self._name)
+        self.dpu_vpd_parser = DpuVpdParser('/var/run/hw-management/eeprom/vpd_data', self._name)
 
     def get_base_mac(self):
         """
@@ -269,7 +270,7 @@ class DpuModule(ModuleBase):
             A string containing the MAC address in the format
             'XX:XX:XX:XX:XX:XX'
         """
-        return self.vpd_parser.get_dpu_base_mac()
+        return self.dpu_vpd_parser.get_dpu_base_mac()
 
     def get_model(self):
         """
@@ -278,7 +279,7 @@ class DpuModule(ModuleBase):
         Returns:
             string: Model/part number of device
         """
-        return self.vpd_parser.get_dpu_model()
+        return self.dpu_vpd_parser.get_dpu_model()
 
     def get_serial(self):
         """
@@ -287,7 +288,7 @@ class DpuModule(ModuleBase):
         Returns:
             string: Serial number of device
         """
-        return self.vpd_parser.get_dpu_serial()
+        return self.dpu_vpd_parser.get_dpu_serial()
 
     def get_revision(self):
         """
@@ -296,7 +297,7 @@ class DpuModule(ModuleBase):
         Returns:
             string: Revision value of device
         """
-        return self.vpd_parser.get_dpu_revision()
+        return self.dpu_vpd_parser.get_dpu_revision()
 
     def reboot(self, reboot_type):
         """
@@ -410,21 +411,55 @@ class DpuModule(ModuleBase):
             REBOOT_CAUSE_HOST_POWERCYCLED_DPU, REBOOT_CAUSE_SW_THERMAL,
             REBOOT_CAUSE_DPU_SELF_REBOOT
         """
-        if utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_from_main_board') == 1:
-            return ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_dpu_thermal') == 1:
-            return ModuleBase.REBOOT_CAUSE_SW_THERMAL, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_aux_pwr_or_reload') == 1:
-            return ModuleBase.REBOOT_CAUSE_POWER_LOSS, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_pwr_off') == 1:
-            return ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, ''
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/tpm_rst') == 1:
-            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/perst_rst') == 1:
-            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/phy_rst') == 1:
-            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'
-        elif utils.read_int_from_file(f'/run/hw-management/system/dpu{self._name.lower()}/system/usbphy_rst') == 1:
-            return ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'
-        else:
-            return ModuleBase.REBOOT_CAUSE_NON_HARDWARE, ''
+        reboot_cause_map = {
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_from_main_board': 
+                (ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, ''),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_dpu_thermal': 
+                (ModuleBase.REBOOT_CAUSE_SW_THERMAL, ''),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_aux_pwr_or_reload': 
+                (ModuleBase.REBOOT_CAUSE_POWER_LOSS, ''),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_pwr_off': 
+                (ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, ''),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/tpm_rst': 
+                (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/perst_rst': 
+                (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/phy_rst': 
+                (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'),
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/usbphy_rst': 
+                (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'),
+        }
+        for f, rd in reboot_cause_map.items():
+            if utils.read_int_from_file(f) == 1:
+                    return rd
+        return ModuleBase.REBOOT_CAUSE_NON_HARDWARE, ''
+
+    def get_midplane_ip(self):
+        """
+        Retrieves the midplane IP-address of the module in a modular chassis
+        When called from the Supervisor, the module could represent the
+        line-card and return the midplane IP-address of the line-card.
+        When called from the line-card, the module will represent the
+        Supervisor and return its midplane IP-address.
+        When called from the DPU, returns the midplane IP-address of the dpu-card.
+        When called from the Switch returns the midplane IP-address of Switch.
+        Returns:
+            A string, the IP-address of the module reachable over the midplane
+        """
+        midplane_data = DeviceDataManager.get_platform_midplane_network()
+        network_cidr = midplane_data['bridge_address']
+        ip_network_cidr = ip_network(network_cidr, strict = False)
+        return str(ip_network_cidr[self.dpu_id])
+
+    def is_midplane_reachable(self):
+        """
+        Retrieves the reachability status of the module from the Supervisor or
+        of the Supervisor from the module via the midplane of the modular chassis
+        Returns:
+            A bool value, should return True if module is reachable via midplane
+        """
+        command = ['ping', '-c', '1', '-W', '1', self.get_midplane_ip()]
+        try:
+            return subprocess.call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+        except:
+            return False

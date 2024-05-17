@@ -1060,16 +1060,16 @@ class SmartSwitchChassis(Chassis):
         count = self.get_num_modules()
         if index < 0:
             raise AssertionError(f"Invalid index = {index} for module initialization with total module count = {count}")
-        if index < count:
-            if not self._module_list:
-                self._module_list = [None] * count
-
-            if not self._module_list[index]:
-                from .module import DpuModule
-                module = DpuModule(index + 1)  # Index + 1 is the DPU ID
-                self._module_list[index] = module
-                self.module_name_index_map[module.get_name()] = index
-                self.module_initialized_count += 1
+        if index >= count:
+            return None
+        if not self._module_list:
+            self._module_list = [None] * count
+        if not self._module_list[index]:
+            from .module import DpuModule
+            module = DpuModule(index + 1)  # Index + 1 is the DPU ID
+            self._module_list[index] = module
+            self.module_name_index_map[module.get_name()] = index
+            self.module_initialized_count += 1
 
     def initialize_modules(self):
         count = self.get_num_modules()

@@ -437,6 +437,9 @@ class TestChassis:
         ]
         DeviceDataManager.get_platform_dpus_data = mock.MagicMock(return_value=pl_data)
         chassis.get_module_dpu_data_port(0) == str({"Ethernet232": "Ethernet0"})
+        with pytest.raises(IndexError):
+            assert chassis.get_module_dpu_data_port(5)
+            assert chassis.get_module_dpu_data_port(-1)
 
         assert chassis.get_dpu_id("DPU1") == 1
         assert chassis.get_dpu_id("DPU3") == 3

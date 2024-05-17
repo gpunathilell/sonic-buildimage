@@ -96,22 +96,3 @@ class VpdParser:
             logger.log_warning("Fail to read vpd info: No key {} in VPD {}".format(key, self.vpd_file))
             return 'N/A'
         return self.vpd_data.get(key, 'N/A')
-
-    def get_dpu_data(self, key=None):
-        
-        if self.dpu_name is None:
-            logger.log_warning("Fail to read vpd info: dpu_name is not initialized for key={} in VPD = {}".format(key, self.vpd_file))
-            return 'N/A'
-        return self.get_entry_value(f"{self.dpu_name}_{key}")
-
-    def get_dpu_base_mac(self):
-        return self.get_dpu_data("BASE_MAC")
-
-    def get_dpu_serial(self):
-        return self.get_dpu_data("SN")
-
-    def get_dpu_revision(self):
-        return self.get_dpu_data("REV")
-
-    def get_dpu_model(self):
-        return self.get_dpu_data("PN")
