@@ -95,3 +95,4 @@ class VpdParser:
             logger.log_warning("Fail to read vpd info: No key {} in VPD {}".format(key, self.vpd_file))
             return 'N/A'
         return self.vpd_data.get(key, 'N/A')
+
