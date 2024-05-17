@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
 # Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,11 +28,10 @@ MFR_VPD_FIELD = "MFR_NAME"
 
 
 class VpdParser:
-    def __init__(self, file_path, dpu_name=None):
+    def __init__(self, file_path):
         self.vpd_data = {}
         self.vpd_file = file_path
         self.vpd_file_last_mtime = None
-        self.dpu_name = dpu_name
 
     def _get_data(self):
         if not os.path.exists(self.vpd_file):

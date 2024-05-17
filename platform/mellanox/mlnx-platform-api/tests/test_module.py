@@ -259,14 +259,14 @@ class TestModule:
         with pytest.raises(TypeError):
             m.get_midplane_ip()
             m1.get_midplane_ip()
-        assert not m.is_midplane_reachable()
-        assert not m1.is_midplane_reachable()
+            m.is_midplane_reachable()
+            m1.is_midplane_reachable()
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value={})
         with pytest.raises(KeyError):
             m.get_midplane_ip()
             m1.get_midplane_ip()
-        assert not m.is_midplane_reachable()
-        assert not m1.is_midplane_reachable()
+            m.is_midplane_reachable()
+            m1.is_midplane_reachable()
         # Check if it works for other CIDR notations
         midplane_data = {
         "bridge_name": "bridge-midplane",
