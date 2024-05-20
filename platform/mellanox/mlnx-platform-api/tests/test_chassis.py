@@ -374,7 +374,10 @@ class TestChassis:
         content = chassis._parse_dmi(os.path.join(test_path, 'dmi_file'))
         assert content.get('Version') == 'A4'
 
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.__init__', mock.MagicMock(return_value=None))
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.connect', mock.MagicMock(return_value=None))
     def test_smartswitch(self):
+        orig_dpu_count = DeviceDataManager.get_dpu_count
         DeviceDataManager.get_dpu_count = mock.MagicMock(return_value=4)
         chassis = SmartSwitchChassis()
 
@@ -435,6 +438,7 @@ class TestChassis:
                 }
             }
         ]
+        orig_dpus_data = DeviceDataManager.get_platform_dpus_data
         DeviceDataManager.get_platform_dpus_data = mock.MagicMock(return_value=pl_data)
         chassis.get_module_dpu_data_port(0) == str({"Ethernet232": "Ethernet0"})
         with pytest.raises(IndexError):
@@ -447,3 +451,5 @@ class TestChassis:
         with pytest.raises(KeyError):
             chassis.get_dpu_id('DPU15')
             chassis.get_dpu_id('ABC')
+        DeviceDataManager.get_platform_dpus_data = orig_dpus_data
+        DeviceDataManager.get_dpu_count = orig_dpu_count

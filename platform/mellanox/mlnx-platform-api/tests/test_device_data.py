@@ -19,6 +19,7 @@ import os
 import pytest
 import subprocess
 import sys
+import json
 if sys.version_info.major == 3:
     from unittest import mock
 else:
@@ -83,3 +84,38 @@ class TestDeviceData:
         assert DeviceDataManager.wait_platform_ready()
         mock_exists.return_value = False
         assert not DeviceDataManager.wait_platform_ready()
+
+    @mock.patch('sonic_py_common.device_info.get_path_to_platform_dir', mock.MagicMock(return_value='/tmp'))
+    @mock.patch('sonic_platform.device_data.utils.load_json_file')
+    def test_dpu_count(self, mock_load_json):
+        mock_value = {
+            "DPUS": [
+                {
+                    "dpu1": {
+                        "interface": {"Ethernet224": "Ethernet0"}
+                    }
+                },
+                {
+                    "dpu2": {
+                        "interface": {"Ethernet232": "Ethernet0"}
+                    },
+                },
+                {
+                    "dpu3": {
+                        "interface": {"EthernetX": "EthernetY"}
+                    }
+                }
+            ],
+            "midplane_network": {
+                "bridge_name": "bridge-midplane",
+                "bridge_address": "169.254.200.254/24"
+            }
+        }
+        mock_load_json.return_value = mock_value
+        return_list = DeviceDataManager.get_platform_dpus_data()
+        print(return_list)
+        dpu_data = mock_value["DPUS"]
+        for index, value in enumerate(dpu_data):
+            assert value == return_list[index]
+        assert mock_value['midplane_network'] == DeviceDataManager.get_platform_midplane_network()
+        assert DeviceDataManager.get_dpu_count() == 3

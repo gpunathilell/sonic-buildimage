@@ -26,11 +26,9 @@ else:
 import pytest
 import sonic_platform.utils
 import subprocess
-from swsscommon import swsscommon
 test_path = os.path.dirname(os.path.abspath(__file__))
 modules_path = os.path.dirname(test_path)
 sys.path.insert(0, modules_path)
-
 import sonic_platform.chassis
 from sonic_platform import utils
 from sonic_platform.chassis import ModularChassis, SmartSwitchChassis
@@ -51,6 +49,8 @@ class TestModule:
         chassis = ModularChassis()
         assert chassis.get_num_sfps() == 4
 
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.__init__', mock.MagicMock(return_value=None))
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.connect', mock.MagicMock(return_value=None))
     def test_chassis_get_num_modules(self):
         chassis = SmartSwitchChassis()
         assert chassis.get_num_modules() == 4
@@ -178,6 +178,8 @@ class TestModule:
         assert len(m._sfp_list) == 0
         assert len(m._thermal_list) == 0
 
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.__init__', mock.MagicMock(return_value=None))
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.connect', mock.MagicMock(return_value=True))
     def test_module_vpd(self):
         from sonic_platform.module import DpuModule
         m = Module(1)
@@ -227,8 +229,11 @@ class TestModule:
         assert m.get_serial() == 'N/A'
         assert m.get_revision() == 'N/A'
 
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.__init__', mock.MagicMock(return_value=None))
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.connect', mock.MagicMock(return_value=None))
+    @mock.patch('swsscommon.swsscommon.SonicV2Connector.get')
     @mock.patch('subprocess.call')
-    def test_dpu_module(self,mock_call):
+    def test_dpu_module(self, mock_call, mock_get):
         from sonic_platform.module import DpuModule
         m = DpuModule(3)
         assert m.get_type() == ModuleBase.MODULE_TYPE_DPU
@@ -248,8 +253,8 @@ class TestModule:
         m.dpuctl_obj.dpu_power_off = mock.MagicMock(return_value=True)
         assert m.set_admin_state(False) is True
         midplane_data = {
-        "bridge_name": "bridge-midplane",
-        "bridge_address": "169.254.200.254/24"
+            "bridge_name": "bridge-midplane",
+            "bridge_address": "169.254.200.254/24"
         }
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value=midplane_data)
         assert m.get_midplane_ip() == "169.254.200.3"
@@ -269,8 +274,8 @@ class TestModule:
             m1.is_midplane_reachable()
         # Check if it works for other CIDR notations
         midplane_data = {
-        "bridge_name": "bridge-midplane",
-        "bridge_address": "169.254.200.254/28"
+            "bridge_name": "bridge-midplane",
+            "bridge_address": "169.254.200.254/28"
         }
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value=midplane_data)
         assert m.get_midplane_ip() == "169.254.200.243"
@@ -294,7 +299,7 @@ class TestModule:
                 return 1
             else:
                 return 0
-        with patch("sonic_platform.utils.read_int_from_file", wraps=mock_read_int_from_file) as mock_read:
+        with patch("sonic_platform.utils.read_int_from_file", wraps=mock_read_int_from_file):
             test_file_path = "dpu3_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
             test_file_path = "dpu3_shtdn_ready"
@@ -302,6 +307,7 @@ class TestModule:
             test_file_path = "dpu3_shtdn_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
             test_file_path = "aaa"
+            # If both files are 0 (shtdn and ready) DPU is in fault state
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT
             test_file_path = "reset_from_main_board"
             assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, '')
@@ -321,3 +327,81 @@ class TestModule:
             assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset')
             test_file_path = "None"
             assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_NON_HARDWARE, '')
+        appl_db_data = {
+            'PORT_TABLE:Ethernet224': {
+                'admin_status': 'up',
+                'alias': 'etp1',
+                'description': 'ARISTA01T0:Ethernet1',
+                'temp_threshold': '100',
+                'voltage': '10',
+                'oper_status': 'up',
+                'voltage_max_threshold': '15',
+            },
+            'PORT_TABLE:Ethernet232': {
+                'admin_status': 'up',
+                'alias': 'etp1',
+                'description': 'ARISTA01T0:Ethernet5',
+                'temp_threshold': '100',
+                'voltage': '10',
+                'oper_status': 'down',
+                'voltage_max_threshold': '15',
+            }
+        }
+
+        def return_port_status(db1, table, key):
+            return appl_db_data[table][key]
+        mock_get.side_effect = return_port_status
+        pl_data = [
+            {
+                "dpu1": {
+                    "interface": {"Ethernet224": "Ethernet0"}
+                }
+            },
+            {
+                "dpu2": {
+                    "interface": {"Ethernet232": "Ethernet0"}
+                },
+            },
+            {
+                "dpu3": {
+                    "interface": {"EthernetX": "EthernetY"}
+                }
+            }
+        ]
+        DeviceDataManager.get_platform_dpus_data = mock.MagicMock(return_value=pl_data)
+        m1 = DpuModule(1)
+        m2 = DpuModule(2)
+        m3 = DpuModule(3)
+        m4 = DpuModule(4)
+        assert m1._is_dataplane_int_online()
+        assert not m2._is_dataplane_int_online()
+        with pytest.raises(KeyError):
+            m3._is_dataplane_int_online()
+            m4._is_dataplane_int_online()
+        file_path_list = ["dpu1_shtdn_ready", "dpu1_ready"]
+        value_list = [1, 1]
+
+        def mock_opp_read_int_from_file(file_path, default=0, raise_exception=False, log_func=None):
+            for ind, file_name in enumerate(file_path_list):
+                if file_path.endswith(file_name):
+                    return value_list[ind]
+            return 0
+        with patch("sonic_platform.utils.read_int_from_file", wraps=mock_opp_read_int_from_file):
+            # Should return offline - as dpu3_shtdn_ready is set and fault_state is off
+            assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
+            value_list[0] = 0
+            # Should return MODULE_STATUS_ONLINE
+            DpuModule.is_midplane_reachable = mock.MagicMock(return_value=False)
+            assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
+            DpuModule.is_midplane_reachable = mock.MagicMock(return_value=True)
+            DpuModule._is_dataplane_int_online = mock.MagicMock(return_value=False)
+            assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_MIDPLANE_ONLINE
+            DpuModule._is_dataplane_int_online = mock.MagicMock(return_value=True)
+            assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_CONTROLPLANE_ONLINE
+            m1.fault_state = True
+            assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT
+            m1.fault_state = False
+            value_list[0] = 1
+            m1.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
+            value_list[0] = 0
+            m1.get_oper_status() == ModuleBase.MODULE_STATUS_CONTROLPLANE_ONLINE

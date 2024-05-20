@@ -26,6 +26,7 @@ from . import utils
 from .device_data import DeviceDataManager
 from .vpd_parser import VpdParser
 from .dpu_vpd_parser import DpuVpdParser
+from swsscommon.swsscommon import SonicV2Connector
 
 # Global logger class instance
 logger = Logger()
@@ -261,6 +262,8 @@ class DpuModule(ModuleBase):
         self.dpuctl_obj = DpuCtlPlat(self._name.lower())
         self.fault_state = False
         self.dpu_vpd_parser = DpuVpdParser('/var/run/hw-management/eeprom/vpd_data', self._name)
+        self.app_db = SonicV2Connector(host='127.0.0.1')
+        self.app_db.connect("APPL_DB")
 
     def get_base_mac(self):
         """
@@ -375,13 +378,23 @@ class DpuModule(ModuleBase):
         return "NVIDIA BlueField-3 DPU"
 
     def get_oper_status(self):
+        states_ = [ModuleBase.MODULE_STATUS_FAULT,
+                   ModuleBase.MODULE_STATUS_OFFLINE,
+                   ModuleBase.MODULE_STATUS_ONLINE,
+                   ModuleBase.MODULE_STATUS_MIDPLANE_ONLINE,
+                   ModuleBase.MODULE_STATUS_CONTROLPLANE_ONLINE]
+        oper_state = states_[0]
         if self.fault_state:
-            return ModuleBase.MODULE_STATUS_FAULT
-        if utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}_ready') == 1:
-            return ModuleBase.MODULE_STATUS_ONLINE
-        elif utils.read_int_from_file(f'/run/hw-management/events/dpu{self.dpu_id}_shtdn_ready') == 1:
-            return ModuleBase.MODULE_STATUS_OFFLINE
-        return ModuleBase.MODULE_STATUS_FAULT # If both ready and shtdn_ready are not set, return fault state
+            return states_[0]
+        elif utils.read_int_from_file(f'/run/hw-management/events/{self.get_name().lower()}_shtdn_ready') == 1:
+            return states_[1]
+        if utils.read_int_from_file(f'/run/hw-management/events/{self.get_name().lower()}_ready') == 1:
+            oper_state = states_[2]
+            if self.is_midplane_reachable():
+                oper_state = states_[3]
+                if self._is_dataplane_int_online():
+                    oper_state = states_[4]
+        return oper_state
 
     ##############################################
     # SmartSwitch methods
@@ -412,26 +425,26 @@ class DpuModule(ModuleBase):
             REBOOT_CAUSE_DPU_SELF_REBOOT
         """
         reboot_cause_map = {
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_from_main_board': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_from_main_board':
                 (ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_dpu_thermal': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_dpu_thermal':
                 (ModuleBase.REBOOT_CAUSE_SW_THERMAL, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_aux_pwr_or_reload': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_aux_pwr_or_reload':
                 (ModuleBase.REBOOT_CAUSE_POWER_LOSS, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_pwr_off': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_pwr_off':
                 (ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/tpm_rst': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/tpm_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/perst_rst': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/perst_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/phy_rst': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/phy_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/usbphy_rst': 
+            f'/run/hw-management/system/dpu{self._name.lower()}/system/usbphy_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'),
         }
         for f, rd in reboot_cause_map.items():
             if utils.read_int_from_file(f) == 1:
-                    return rd
+                return rd
         return ModuleBase.REBOOT_CAUSE_NON_HARDWARE, ''
 
     def get_midplane_ip(self):
@@ -448,7 +461,7 @@ class DpuModule(ModuleBase):
         """
         midplane_data = DeviceDataManager.get_platform_midplane_network()
         network_cidr = midplane_data['bridge_address']
-        ip_network_cidr = ip_network(network_cidr, strict = False)
+        ip_network_cidr = ip_network(network_cidr, strict=False)
         return str(ip_network_cidr[self.dpu_id])
 
     def is_midplane_reachable(self):
@@ -461,5 +474,19 @@ class DpuModule(ModuleBase):
         command = ['ping', '-c', '1', '-W', '1', self.get_midplane_ip()]
         try:
             return subprocess.call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
-        except:
+        except Exception:
             return False
+
+    def _is_dataplane_int_online(self):
+        platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
+        module_name = self.get_name()
+        for dictionary in platform_dpus_data:
+            if module_name.lower() in dictionary:
+                npu_dpu_mapping = dictionary[module_name.lower()]["interface"]
+        if not npu_dpu_mapping:
+            raise KeyError(module_name)
+        npu_int = list(npu_dpu_mapping.keys())[0]
+        oper_status = self.app_db.get("APPL_DB", "PORT_TABLE:" + npu_int, "oper_status")
+        if oper_status == "up":
+            return True
+        return False

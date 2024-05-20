@@ -269,7 +269,7 @@ class DeviceDataManager:
         platform_path = device_info.get_path_to_platform_dir()
         platform_json_path = os.path.join(platform_path, 'platform.json')
         json_data = utils.load_json_file(platform_json_path)
-        return json_data.find('DPUS', None)
+        return json_data.get('DPUS', None)
 
     @classmethod
     def get_platform_midplane_network(cls):
@@ -277,7 +277,7 @@ class DeviceDataManager:
         platform_path = device_info.get_path_to_platform_dir()
         platform_json_path = os.path.join(platform_path, 'platform.json')
         json_data = utils.load_json_file(platform_json_path)
-        return json_data.find('midplane_network', None)
+        return json_data.get('midplane_network', None)
 
     @classmethod
     @utils.read_only_cache()
