@@ -258,15 +258,23 @@ class TestModule:
         }
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value=midplane_data)
         assert m.get_midplane_ip() == "169.254.200.3"
+        assert m.midplane_ip == "169.254.200.3"
         m1 = DpuModule(4)
         assert m1.get_midplane_ip() == "169.254.200.4"
+        assert m1.midplane_ip == "169.254.200.4"
+        m1.midplane_ip = None
+        m.midplane_ip = None
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value=None)
         with pytest.raises(TypeError):
             m.get_midplane_ip()
             m1.get_midplane_ip()
             m.is_midplane_reachable()
             m1.is_midplane_reachable()
+        original_function = DpuModule._is_midplane_up
+        DpuModule._is_midplane_up = mock.MagicMock(return_value=True)
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value={})
+        m1.midplane_ip = None
+        m.midplane_ip = None
         with pytest.raises(KeyError):
             m.get_midplane_ip()
             m1.get_midplane_ip()
@@ -278,6 +286,8 @@ class TestModule:
             "bridge_address": "169.254.200.254/28"
         }
         DeviceDataManager.get_platform_midplane_network = mock.MagicMock(return_value=midplane_data)
+        m1.midplane_ip = None
+        m.midplane_ip = None
         assert m.get_midplane_ip() == "169.254.200.243"
         assert m1.get_midplane_ip() == "169.254.200.244"
         command = ['ping', '-c', '1', '-W', '1', "169.254.200.243"]
@@ -290,9 +300,28 @@ class TestModule:
         mock_call.side_effect = subprocess.CalledProcessError(1, command)
         assert not m.is_midplane_reachable()
         assert not m1.is_midplane_reachable()
+        DpuModule._is_midplane_up = mock.MagicMock(return_value=False)
+        assert not m.is_midplane_reachable()
+        assert not m1.is_midplane_reachable()
+        DpuModule._is_midplane_up = original_function
 
         m.fault_state = False
         test_file_path = ""
+        pl_data = {
+            "dpu1": {
+                "interface": {"Ethernet224": "Ethernet0"},
+                "midplane_interface": "dpu1_mid"
+            },
+            "dpu2": {
+                "interface": {"Ethernet232": "Ethernet0"},
+                "midplane_interface": "dpu2_mid"
+            },
+            "dpu3": {
+                "interface": {"EthernetX": "EthernetY"},
+                "midplane_interface": "dpu3_mid"
+            }
+        }
+        DeviceDataManager.get_platform_dpus_data = mock.MagicMock(return_value=pl_data)
 
         def mock_read_int_from_file(file_path, default=0, raise_exception=False, log_func=None):
             if file_path.endswith(test_file_path):
@@ -307,8 +336,8 @@ class TestModule:
             test_file_path = "dpu3_shtdn_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
             test_file_path = "aaa"
-            # If both files are 0 (shtdn and ready) DPU is in fault state
-            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT
+            # Default state is offline
+            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
             test_file_path = "reset_from_main_board"
             assert m.get_reboot_cause() == (ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, '')
             test_file_path = "reset_dpu_thermal"
@@ -351,35 +380,34 @@ class TestModule:
         def return_port_status(db1, table, key):
             return appl_db_data[table][key]
         mock_get.side_effect = return_port_status
-        pl_data = [
-            {
-                "dpu1": {
-                    "interface": {"Ethernet224": "Ethernet0"}
-                }
-            },
-            {
-                "dpu2": {
-                    "interface": {"Ethernet232": "Ethernet0"}
-                },
-            },
-            {
-                "dpu3": {
-                    "interface": {"EthernetX": "EthernetY"}
-                }
-            }
-        ]
-        DeviceDataManager.get_platform_dpus_data = mock.MagicMock(return_value=pl_data)
+
         m1 = DpuModule(1)
         m2 = DpuModule(2)
         m3 = DpuModule(3)
         m4 = DpuModule(4)
-        assert m1._is_dataplane_int_online()
-        assert not m2._is_dataplane_int_online()
+        assert not m1.midplane_interface
+        with patch("sonic_platform.utils.read_str_from_file", wraps=mock.MagicMock(return_value="up")):
+            assert m1._is_midplane_up()
+            assert m2._is_midplane_up()
+            assert m3._is_midplane_up()
+            with pytest.raises(KeyError):
+                m4._is_midplane_up()
+            assert m1.midplane_interface == "dpu1_mid"
+            assert m2.midplane_interface == "dpu2_mid"
+            assert m3.midplane_interface == "dpu3_mid"
+        with patch("sonic_platform.utils.read_str_from_file", wraps=mock.MagicMock(return_value="down")):
+            assert not m1._is_midplane_up()
+            assert not m2._is_midplane_up()
+            assert not m3._is_midplane_up()
+        assert m1._is_dataplane_online()
+        assert not m2._is_dataplane_online()
         with pytest.raises(KeyError):
-            m3._is_dataplane_int_online()
-            m4._is_dataplane_int_online()
+            m3._is_dataplane_online()
+            m4._is_dataplane_online()
         file_path_list = ["dpu1_shtdn_ready", "dpu1_ready"]
-        value_list = [1, 1]
+        value_list = [1, 0]
+        mock_get.side_effect = None
+        mock_get.return_value = "down"
 
         def mock_opp_read_int_from_file(file_path, default=0, raise_exception=False, log_func=None):
             for ind, file_name in enumerate(file_path_list):
@@ -389,14 +417,13 @@ class TestModule:
         with patch("sonic_platform.utils.read_int_from_file", wraps=mock_opp_read_int_from_file):
             # Should return offline - as dpu3_shtdn_ready is set and fault_state is off
             assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
-            value_list[0] = 0
-            # Should return MODULE_STATUS_ONLINE
+            value_list[1] = 1
             DpuModule.is_midplane_reachable = mock.MagicMock(return_value=False)
             assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
             DpuModule.is_midplane_reachable = mock.MagicMock(return_value=True)
-            DpuModule._is_dataplane_int_online = mock.MagicMock(return_value=False)
+            DpuModule._is_dataplane_online = mock.MagicMock(return_value=False)
             assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_MIDPLANE_ONLINE
-            DpuModule._is_dataplane_int_online = mock.MagicMock(return_value=True)
+            DpuModule._is_dataplane_online = mock.MagicMock(return_value=True)
             assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_CONTROLPLANE_ONLINE
             m1.fault_state = True
             assert m1.get_oper_status() == ModuleBase.MODULE_STATUS_FAULT

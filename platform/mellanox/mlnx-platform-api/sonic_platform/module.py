@@ -264,6 +264,9 @@ class DpuModule(ModuleBase):
         self.dpu_vpd_parser = DpuVpdParser('/var/run/hw-management/eeprom/vpd_data', self._name)
         self.app_db = SonicV2Connector(host='127.0.0.1')
         self.app_db.connect("APPL_DB")
+        self.midplane_ip = None
+        self.midplane_interface = None
+        self.npu_interface = None
 
     def get_base_mac(self):
         """
@@ -378,23 +381,25 @@ class DpuModule(ModuleBase):
         return "NVIDIA BlueField-3 DPU"
 
     def get_oper_status(self):
-        states_ = [ModuleBase.MODULE_STATUS_FAULT,
-                   ModuleBase.MODULE_STATUS_OFFLINE,
-                   ModuleBase.MODULE_STATUS_ONLINE,
-                   ModuleBase.MODULE_STATUS_MIDPLANE_ONLINE,
-                   ModuleBase.MODULE_STATUS_CONTROLPLANE_ONLINE]
-        oper_state = states_[0]
         if self.fault_state:
-            return states_[0]
-        elif utils.read_int_from_file(f'/run/hw-management/events/{self.get_name().lower()}_shtdn_ready') == 1:
-            return states_[1]
-        if utils.read_int_from_file(f'/run/hw-management/events/{self.get_name().lower()}_ready') == 1:
-            oper_state = states_[2]
-            if self.is_midplane_reachable():
-                oper_state = states_[3]
-                if self._is_dataplane_int_online():
-                    oper_state = states_[4]
-        return oper_state
+            return ModuleBase.MODULE_STATUS_FAULT
+
+        dataplane_state = self._is_dataplane_online()
+        midplane_state = self.is_midplane_reachable()
+
+        if dataplane_state and midplane_state:
+            return ModuleBase.MODULE_STATUS_CONTROLPLANE_ONLINE
+
+        if dataplane_state:
+            return ModuleBase.MODULE_STATUS_DATAPLANE_ONLINE
+
+        if midplane_state:
+            return ModuleBase.MODULE_STATUS_MIDPLANE_ONLINE
+
+        if self._is_online():
+            return ModuleBase.MODULE_STATUS_ONLINE
+
+        return ModuleBase.MODULE_STATUS_OFFLINE
 
     ##############################################
     # SmartSwitch methods
@@ -459,10 +464,13 @@ class DpuModule(ModuleBase):
         Returns:
             A string, the IP-address of the module reachable over the midplane
         """
-        midplane_data = DeviceDataManager.get_platform_midplane_network()
-        network_cidr = midplane_data['bridge_address']
-        ip_network_cidr = ip_network(network_cidr, strict=False)
-        return str(ip_network_cidr[self.dpu_id])
+        if not self.midplane_ip:
+            midplane_data = DeviceDataManager.get_platform_midplane_network()
+            network_cidr = midplane_data['bridge_address']
+            ip_network_cidr = ip_network(network_cidr, strict=False)
+            self.midplane_ip = str(ip_network_cidr[self.dpu_id])
+
+        return self.midplane_ip
 
     def is_midplane_reachable(self):
         """
@@ -471,22 +479,33 @@ class DpuModule(ModuleBase):
         Returns:
             A bool value, should return True if module is reachable via midplane
         """
+        if not self._is_midplane_up():
+            return False
+
         command = ['ping', '-c', '1', '-W', '1', self.get_midplane_ip()]
         try:
             return subprocess.call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
         except Exception:
             return False
 
-    def _is_dataplane_int_online(self):
-        platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
-        module_name = self.get_name()
-        for dictionary in platform_dpus_data:
-            if module_name.lower() in dictionary:
-                npu_dpu_mapping = dictionary[module_name.lower()]["interface"]
-        if not npu_dpu_mapping:
-            raise KeyError(module_name)
-        npu_int = list(npu_dpu_mapping.keys())[0]
-        oper_status = self.app_db.get("APPL_DB", "PORT_TABLE:" + npu_int, "oper_status")
+    def _is_midplane_up(self):
+        if not self.midplane_interface:
+            platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
+            self.midplane_interface = platform_dpus_data[self.get_name().lower()]["midplane_interface"]
+
+        return utils.read_str_from_file(f'/sys/class/net/{self.midplane_interface}/operstate') == "up"
+
+    def _is_dataplane_online(self):
+        """Check if the dataplane interface is online by querying APPL_DB
+        """
+        if not self.npu_interface:
+            platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
+            npu_dpu_mapping = platform_dpus_data[self.get_name().lower()]["interface"]
+            self.npu_interface = list(npu_dpu_mapping.keys())[0]
+        oper_status = self.app_db.get("APPL_DB", "PORT_TABLE:" + self.npu_interface, "oper_status")
         if oper_status == "up":
             return True
         return False
+
+    def _is_online(self):
+        return utils.read_int_from_file(f'/run/hw-management/events/{self.get_name().lower()}_ready') == 1

@@ -1182,6 +1182,4 @@ class SmartSwitchChassis(Chassis):
         platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
         module = self._module_list[index]
         module_name = module.get_name()
-        for dictionary in platform_dpus_data:
-            if module_name.lower() in dictionary:
-                return dictionary[module_name.lower()]["interface"]
+        platform_dpus_data[module_name.lower()]["interface"]
