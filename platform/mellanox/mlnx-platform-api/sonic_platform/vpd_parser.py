@@ -96,3 +96,4 @@ class VpdParser:
             return 'N/A'
         return self.vpd_data.get(key, 'N/A')
 
+
