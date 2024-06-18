@@ -22,7 +22,7 @@ import inotify.adapters
 
 try:
     from sonic_py_common.logger import Logger
-    from sonic_platform import utils
+    from . import utils
 except ImportError as e:
     raise ImportError(str(e) + '- required module not found') from e
 

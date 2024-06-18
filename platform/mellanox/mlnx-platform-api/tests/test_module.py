@@ -308,12 +308,16 @@ class TestModule:
         m.fault_state = False
         test_file_path = ""
         pl_data = {
-            "dpu1": {
+            "dpu0": {
                 "interface": {"Ethernet224": "Ethernet0"},
+                "midplane_interface": "dpu0_mid"
+            },
+            "dpu1": {
+                "interface": {"Ethernet232": "Ethernet1"},
                 "midplane_interface": "dpu1_mid"
             },
             "dpu2": {
-                "interface": {"Ethernet232": "Ethernet0"},
+                "interface": {"Ethernet236": "Ethernet2"},
                 "midplane_interface": "dpu2_mid"
             },
             "dpu3": {
@@ -329,10 +333,9 @@ class TestModule:
             else:
                 return 0
         with patch("sonic_platform.utils.read_int_from_file", wraps=mock_read_int_from_file):
-            test_file_path = "dpu3_ready"
+            # HW name of DPU3 = dpu4 since HW name starts from dpu1
+            test_file_path = "dpu4_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_ONLINE
-            test_file_path = "dpu3_shtdn_ready"
-            assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
             test_file_path = "dpu3_shtdn_ready"
             assert m.get_oper_status() == ModuleBase.MODULE_STATUS_OFFLINE
             test_file_path = "aaa"
@@ -381,9 +384,9 @@ class TestModule:
             return appl_db_data[table][key]
         mock_get.side_effect = return_port_status
 
-        m1 = DpuModule(1)
-        m2 = DpuModule(2)
-        m3 = DpuModule(3)
+        m1 = DpuModule(0)
+        m2 = DpuModule(1)
+        m3 = DpuModule(2)
         m4 = DpuModule(4)
         assert not m1.midplane_interface
         with patch("sonic_platform.utils.read_str_from_file", wraps=mock.MagicMock(return_value="up")):
@@ -392,9 +395,9 @@ class TestModule:
             assert m3._is_midplane_up()
             with pytest.raises(KeyError):
                 m4._is_midplane_up()
-            assert m1.midplane_interface == "dpu1_mid"
-            assert m2.midplane_interface == "dpu2_mid"
-            assert m3.midplane_interface == "dpu3_mid"
+            assert m1.midplane_interface == "dpu0_mid"
+            assert m2.midplane_interface == "dpu1_mid"
+            assert m3.midplane_interface == "dpu2_mid"
         with patch("sonic_platform.utils.read_str_from_file", wraps=mock.MagicMock(return_value="down")):
             assert not m1._is_midplane_up()
             assert not m2._is_midplane_up()

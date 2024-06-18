@@ -1059,14 +1059,14 @@ class SmartSwitchChassis(Chassis):
     def initialize_single_module(self, index):
         count = self.get_num_modules()
         if index < 0:
-            raise AssertionError(f"Invalid index = {index} for module initialization with total module count = {count}")
+            raise RuntimeError(f"Invalid index = {index} for module initialization with total module count = {count}")
         if index >= count:
-            return None
+            return
         if not self._module_list:
             self._module_list = [None] * count
         if not self._module_list[index]:
             from .module import DpuModule
-            module = DpuModule(index + 1)  # Index + 1 is the DPU ID
+            module = DpuModule(index)
             self._module_list[index] = module
             self.module_name_index_map[module.get_name()] = index
             self.module_initialized_count += 1
@@ -1182,4 +1182,4 @@ class SmartSwitchChassis(Chassis):
         platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
         module = self._module_list[index]
         module_name = module.get_name()
-        platform_dpus_data[module_name.lower()]["interface"]
+        return platform_dpus_data[module_name.lower()]["interface"]

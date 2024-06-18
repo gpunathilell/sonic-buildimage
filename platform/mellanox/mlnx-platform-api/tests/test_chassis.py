@@ -388,7 +388,7 @@ class TestChassis:
         chassis._module_list = None
         chassis.module_initialized_count = 0
         chassis.module_name_index_map = {}
-        with pytest.raises(AssertionError, match="Invalid index = -1 for module"
+        with pytest.raises(RuntimeError, match="Invalid index = -1 for module"
                            " initialization with total module count = 4"):
             chassis.initialize_single_module(-1)
             chassis.get_module(-1)
@@ -412,8 +412,8 @@ class TestChassis:
         assert chassis.get_module(4) is None
 
         chassis.initialize_modules()
-        assert chassis.get_module_index('DPU1') == 0
-        assert chassis.get_module_index('DPU4') == 3
+        assert chassis.get_module_index('DPU0') == 0
+        assert chassis.get_module_index('DPU3') == 3
         with pytest.raises(KeyError):
             chassis.get_module_index('DPU10')
             chassis.get_module_index('ABC')

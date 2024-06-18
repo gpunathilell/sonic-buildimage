@@ -264,20 +264,24 @@ class DeviceDataManager:
         return ComponentCPLD.get_component_list()
 
     @classmethod
+    @utils.read_only_cache()
     def get_platform_dpus_data(cls):
-        from sonic_py_common import device_info
-        platform_path = device_info.get_path_to_platform_dir()
-        platform_json_path = os.path.join(platform_path, 'platform.json')
-        json_data = utils.load_json_file(platform_json_path)
+        json_data = cls.get_platform_json_data()
         return json_data.get('DPUS', None)
 
     @classmethod
+    @utils.read_only_cache()
     def get_platform_midplane_network(cls):
+        json_data = cls.get_platform_json_data()
+        return json_data.get('midplane_network', None)
+
+    @classmethod
+    @utils.read_only_cache()
+    def get_platform_json_data(cls):
         from sonic_py_common import device_info
         platform_path = device_info.get_path_to_platform_dir()
         platform_json_path = os.path.join(platform_path, 'platform.json')
-        json_data = utils.load_json_file(platform_json_path)
-        return json_data.get('midplane_network', None)
+        return utils.load_json_file(platform_json_path)
 
     @classmethod
     @utils.read_only_cache()

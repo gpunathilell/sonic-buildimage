@@ -19,7 +19,7 @@ import redis
 import threading
 from sonic_platform_base.module_base import ModuleBase
 from sonic_py_common.logger import Logger
-from .dpuctl_hwm import DpuCtlPlat
+from .dpuctlplat import DpuCtlPlat
 from ipaddress import ip_network
 
 from . import utils
@@ -259,7 +259,8 @@ class DpuModule(ModuleBase):
         super(DpuModule, self).__init__()
         self.dpu_id = dpu_id
         self._name = f"DPU{self.dpu_id}"
-        self.dpuctl_obj = DpuCtlPlat(self._name.lower())
+        self._dpu_hw_name = f"dpu{self.dpu_id + 1}" # DPU names starts with dpu1 in hw
+        self.dpuctl_obj = DpuCtlPlat(self._dpu_hw_name)
         self.fault_state = False
         self.dpu_vpd_parser = DpuVpdParser('/var/run/hw-management/eeprom/vpd_data', self._name)
         self.app_db = SonicV2Connector(host='127.0.0.1')
@@ -429,25 +430,25 @@ class DpuModule(ModuleBase):
             REBOOT_CAUSE_HOST_POWERCYCLED_DPU, REBOOT_CAUSE_SW_THERMAL,
             REBOOT_CAUSE_DPU_SELF_REBOOT
         """
-        reboot_cause_map = {
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_from_main_board':
+        self.reboot_cause_map = {
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/reset_from_main_board':
                 (ModuleBase.REBOOT_CAUSE_HOST_RESET_DPU, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_dpu_thermal':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/reset_dpu_thermal':
                 (ModuleBase.REBOOT_CAUSE_SW_THERMAL, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_aux_pwr_or_reload':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/reset_aux_pwr_or_reload':
                 (ModuleBase.REBOOT_CAUSE_POWER_LOSS, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/reset_pwr_off':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/reset_pwr_off':
                 (ModuleBase.REBOOT_CAUSE_DPU_SELF_REBOOT, ''),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/tpm_rst':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/tpm_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Reset by the TPM module'),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/perst_rst':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/perst_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'PERST# signal to ASIC'),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/phy_rst':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/phy_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'Phy reset'),
-            f'/run/hw-management/system/dpu{self._name.lower()}/system/usbphy_rst':
+            f'/run/hw-management/system/dpu{self._dpu_hw_name}/system/usbphy_rst':
                 (ModuleBase.REBOOT_CAUSE_HARDWARE_OTHER, 'USB Phy reset'),
         }
-        for f, rd in reboot_cause_map.items():
+        for f, rd in self.reboot_cause_map.items():
             if utils.read_int_from_file(f) == 1:
                 return rd
         return ModuleBase.REBOOT_CAUSE_NON_HARDWARE, ''
@@ -469,7 +470,6 @@ class DpuModule(ModuleBase):
             network_cidr = midplane_data['bridge_address']
             ip_network_cidr = ip_network(network_cidr, strict=False)
             self.midplane_ip = str(ip_network_cidr[self.dpu_id])
-
         return self.midplane_ip
 
     def is_midplane_reachable(self):
@@ -486,13 +486,14 @@ class DpuModule(ModuleBase):
         try:
             return subprocess.call(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
         except Exception:
+            logger.log_error(f"Failed to check midplane reachability for {self.get_name()}!")
             return False
 
     def _is_midplane_up(self):
         if not self.midplane_interface:
             platform_dpus_data = DeviceDataManager.get_platform_dpus_data()
+            print(platform_dpus_data)
             self.midplane_interface = platform_dpus_data[self.get_name().lower()]["midplane_interface"]
-
         return utils.read_str_from_file(f'/sys/class/net/{self.midplane_interface}/operstate') == "up"
 
     def _is_dataplane_online(self):
@@ -508,4 +509,4 @@ class DpuModule(ModuleBase):
         return False
 
     def _is_online(self):
-        return utils.read_int_from_file(f'/run/hw-management/events/{self.get_name().lower()}_ready') == 1
+        return utils.read_int_from_file(f'/run/hw-management/events/{self._dpu_hw_name}_ready') == 1
