@@ -43,7 +43,7 @@ class InotifyHelper():
                                     os.strerror(errno.ENOENT),
                                     self.file_path)
 
-    def add_watch(self, timeout, expected_value):
+    def wait_watch(self, timeout, expected_value):
         """Waits for changes in file until specified time and
           compares written value to expected value"""
         self.inotify_obj.add_watch(self.file_path,

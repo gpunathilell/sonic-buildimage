@@ -74,7 +74,7 @@ class DpuCtlPlat():
         self.write_file(self.set_go_down_path, "1")
         try:
             get_shtdn_inotify = InotifyHelper(self.get_shtdn_ready_path)
-            dpu_shtdn_rdy = get_shtdn_inotify.add_watch(WAIT_FOR_SHTDN, 1)
+            dpu_shtdn_rdy = get_shtdn_inotify.wait_watch(WAIT_FOR_SHTDN, 1)
         except (FileNotFoundError, PermissionError) as inotify_exc:
             raise type(inotify_exc)(f"{self.get_name()}:{str(inotify_exc)}")
         if not dpu_shtdn_rdy:
@@ -101,7 +101,7 @@ class DpuCtlPlat():
             logger.log_info(f"{self.get_name()}: Failed Force Power on! Retry {4-count}..")
         self.write_file(self.set_pwr_f_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
-        dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
+        dpu_rdy = get_rdy_inotify.wait_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
             if count > 1:
                 time.sleep(1)
@@ -115,7 +115,7 @@ class DpuCtlPlat():
         """Per DPU Power on without force private function"""
         self.write_file(self.set_pwr_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
-        dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
+        dpu_rdy = get_rdy_inotify.wait_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
             logger.log_error(f"{self.get_name()}: Failed power on! Trying Force Power on")
             return self._power_on_force()
@@ -137,7 +137,7 @@ class DpuCtlPlat():
             self.dpu_power_off(forced=True)
         self.write_file(self.set_go_down_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
-        dpu_rdy = get_rdy_inotify.add_watch(WAIT_FOR_DPU_READY, 1)
+        dpu_rdy = get_rdy_inotify.wait_watch(WAIT_FOR_DPU_READY, 1)
         if not dpu_rdy:
             return self.dpu_power_on(forced=True)
         logger.log_info(f"{self.get_name()}: Reboot complete")
