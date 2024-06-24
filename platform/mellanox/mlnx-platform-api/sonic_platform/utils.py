@@ -282,11 +282,13 @@ def wait_until(predict, timeout, interval=1, *args, **kwargs):
     Returns:
         _type_: _description_
     """
+    if predict(*args, **kwargs):
+        return True
     while timeout > 0:
-        if predict(*args, **kwargs):
-            return True
         time.sleep(interval)
         timeout -= interval
+        if predict(*args, **kwargs):
+            return True
     return False
 
 
