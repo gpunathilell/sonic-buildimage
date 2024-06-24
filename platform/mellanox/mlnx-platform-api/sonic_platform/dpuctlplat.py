@@ -22,7 +22,7 @@ import sys
 
 try:
     from .inotify_helper import InotifyHelper
-    from sonic_py_common.logger import Logger
+    from sonic_py_common.logger import SysLogger
     from . import utils
 except ImportError as e:
     raise ImportError(str(e)) from e
@@ -30,7 +30,7 @@ except ImportError as e:
 EVENT_BASE = "/var/run/hw-management/events/"
 SYSTEM_BASE = "/var/run/hw-management/system/"
 CONFIG_BASE = "/var/run/hw-management/config"
-logger = Logger()
+logger = SysLogger()
 
 WAIT_FOR_SHTDN = 60
 WAIT_FOR_DPU_READY = 60

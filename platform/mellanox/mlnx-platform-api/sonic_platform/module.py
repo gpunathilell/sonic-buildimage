@@ -18,7 +18,7 @@ import subprocess
 import redis
 import threading
 from sonic_platform_base.module_base import ModuleBase
-from sonic_py_common.logger import Logger
+from sonic_py_common.logger import SysLogger
 from .dpuctlplat import DpuCtlPlat
 from ipaddress import ip_network
 
@@ -29,7 +29,7 @@ from .dpu_vpd_parser import DpuVpdParser
 from swsscommon.swsscommon import SonicV2Connector
 
 # Global logger class instance
-logger = Logger()
+logger = SysLogger()
 
 
 class Module(ModuleBase):
@@ -504,9 +504,7 @@ class DpuModule(ModuleBase):
             npu_dpu_mapping = platform_dpus_data[self.get_name().lower()]["interface"]
             self.npu_interface = list(npu_dpu_mapping.keys())[0]
         oper_status = self.app_db.get("APPL_DB", "PORT_TABLE:" + self.npu_interface, "oper_status")
-        if oper_status == "up":
-            return True
-        return False
+        return oper_status == "up":
 
     def _is_online(self):
         return utils.read_int_from_file(f'/run/hw-management/events/{self._dpu_hw_name}_ready') == 1

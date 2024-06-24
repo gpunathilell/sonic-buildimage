@@ -21,12 +21,12 @@ import errno
 import inotify.adapters
 
 try:
-    from sonic_py_common.logger import Logger
+    from sonic_py_common.logger import SysLogger
     from . import utils
 except ImportError as e:
     raise ImportError(str(e) + '- required module not found') from e
 
-logger = Logger()
+logger = SysLogger()
 
 
 class InotifyHelper():
