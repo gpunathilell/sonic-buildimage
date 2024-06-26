@@ -504,7 +504,7 @@ class DpuModule(ModuleBase):
             npu_dpu_mapping = platform_dpus_data[self.get_name().lower()]["interface"]
             self.npu_interface = list(npu_dpu_mapping.keys())[0]
         oper_status = self.app_db.get("APPL_DB", "PORT_TABLE:" + self.npu_interface, "oper_status")
-        return oper_status == "up":
+        return oper_status == "up"
 
     def _is_online(self):
         return utils.read_int_from_file(f'/run/hw-management/events/{self._dpu_hw_name}_ready') == 1

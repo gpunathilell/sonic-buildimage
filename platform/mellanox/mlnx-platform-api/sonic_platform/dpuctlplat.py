@@ -98,7 +98,7 @@ class DpuCtlPlat():
     def _power_on_force(self, count=4):
         """Per DPU Power on with force private function"""
         if count < 4:
-            logger.log_info(f"{self.get_name()}: Failed Force Power on! Retry {4-count}..")
+            logger.log_error(f"{self.get_name()}: Failed Force Power on! Retry {4-count}..")
         self.write_file(self.set_pwr_f_path, "0")
         get_rdy_inotify = InotifyHelper(self.get_dpu_rdy_path)
         dpu_rdy = get_rdy_inotify.wait_watch(WAIT_FOR_DPU_READY, 1)
