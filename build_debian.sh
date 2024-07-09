@@ -427,7 +427,7 @@ sudo awk -v replacement="$repl_text" '
         print
     }
     ' "$filename" > temp_file && sudo mv temp_file "$filename"
-chmod +x /sbin/resolvconf
+chmod +x $filename
 # default rsyslog version is 8.2110.0 which has a bug on log rate limit,
 # use backport version
 sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -t bullseye-backports -y install rsyslog
