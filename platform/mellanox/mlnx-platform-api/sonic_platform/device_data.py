@@ -161,7 +161,6 @@ DEVICE_DATA = {
     }
 }
 
-
 class DeviceDataManager:
     @classmethod
     @utils.read_only_cache()
@@ -258,6 +257,14 @@ class DeviceDataManager:
 
     @classmethod
     @utils.read_only_cache()
+    def get_dpu_count(cls):
+        dpu_data = cls.get_platform_dpus_data()
+        if not dpu_data:
+            return 0
+        return len(dpu_data)
+
+    @classmethod
+    @utils.read_only_cache()
     def get_linecard_max_port_count(cls):
         platform_data = DEVICE_DATA.get(cls.get_platform_name(), None)
         if not platform_data:
@@ -287,6 +294,26 @@ class DeviceDataManager:
         if cls.get_platform_name() in ['x86_64-nvidia_sn4280-r0']:
             return ComponentCPLDSN4280.get_component_list() + ComponenetFPGADPU.get_component_list()
         return ComponentCPLD.get_component_list()
+
+    @classmethod
+    @utils.read_only_cache()
+    def get_platform_dpus_data(cls):
+        json_data = cls.get_platform_json_data()
+        return json_data.get('DPUS', None)
+
+    @classmethod
+    @utils.read_only_cache()
+    def get_platform_midplane_network(cls):
+        json_data = cls.get_platform_json_data()
+        return json_data.get('midplane_network', None)
+
+    @classmethod
+    @utils.read_only_cache()
+    def get_platform_json_data(cls):
+        from sonic_py_common import device_info
+        platform_path = device_info.get_path_to_platform_dir()
+        platform_json_path = os.path.join(platform_path, 'platform.json')
+        return utils.load_json_file(platform_json_path)
 
     @classmethod
     @utils.read_only_cache()
