@@ -841,9 +841,9 @@ sudo cp files/image_config/resolv-config/resolv.conf.head $FILESYSTEM_ROOT/etc/r
 
 ## Add debug messages in DNS
 filename="$FILESYSTEM_ROOT/sbin/resolvconf"
-sudo sed -i '/report_err \"Run lock held by another process for longer than $LOCK_WAIT_S seconds\"; exit 1; /c\     report_err \"Run lock held by another process for longer than $LOCK_WAIT_S seconds\"; exit 3; ' $filename
-sudo sed -i '/: >| \"$ENABLE_UPDATES_FLAGFILE\" || exit 1/c\	: >| \"$ENABLE_UPDATES_FLAGFILE\" || exit 4  }' $filename
-sudo sed -i '/rm -f "$ENABLE_UPDATES_FLAGFILE" || exit 1/c\	rm -f \"$ENABLE_UPDATES_FLAGFILE\" || exit 5  }' $filename
+sudo sed -i '/report_err \"Run lock held by another process for longer than $LOCK_WAIT_S seconds\"; exit 1; /c\     { report_err \"Run lock held by another process for longer than $LOCK_WAIT_S seconds\"; exit 3; } ' $filename
+sudo sed -i '/: >| \"$ENABLE_UPDATES_FLAGFILE\" || exit 1/c\	: >| \"$ENABLE_UPDATES_FLAGFILE\" || exit 4  ' $filename
+sudo sed -i '/rm -f "$ENABLE_UPDATES_FLAGFILE" || exit 1/c\	rm -f \"$ENABLE_UPDATES_FLAGFILE\" || exit 5  ' $filename
 repl_text="exit 6"
 sudo awk -v replacement="$repl_text" '
     {
