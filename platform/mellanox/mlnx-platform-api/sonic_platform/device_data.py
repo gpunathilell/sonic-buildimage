@@ -276,6 +276,20 @@ class DeviceDataManager:
 
     @classmethod
     @utils.read_only_cache()
+    def get_platform_midplane_network(cls):
+        json_data = cls.get_platform_json_data()
+        return json_data.get('midplane_network', None)
+
+    @classmethod
+    @utils.read_only_cache()
+    def get_dpu_count(cls):
+        dpu_data = cls.get_platform_dpus_data()
+        if not dpu_data:
+            return 0
+        return len(dpu_data)
+
+    @classmethod
+    @utils.read_only_cache()
     def get_platform_json_data(cls):
         from sonic_py_common import device_info
         platform_path = device_info.get_path_to_platform_dir()

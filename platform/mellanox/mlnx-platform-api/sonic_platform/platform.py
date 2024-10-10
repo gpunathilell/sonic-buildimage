@@ -22,7 +22,7 @@
 
 try:
     from sonic_platform_base.platform_base import PlatformBase
-    from .chassis import Chassis, ModularChassis
+    from .chassis import Chassis, ModularChassis, SmartSwitchChassis
     from .device_data import DeviceDataManager
 except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
@@ -30,6 +30,8 @@ except ImportError as e:
 class Platform(PlatformBase):
     def __init__(self):
         PlatformBase.__init__(self)
+        if DeviceDataManager.get_dpu_count():
+            self._chassis = SmartSwitchChassis()
         if DeviceDataManager.get_linecard_count() == 0:
             self._chassis = Chassis()
         else:
