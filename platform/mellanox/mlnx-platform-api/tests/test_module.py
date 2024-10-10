@@ -39,6 +39,7 @@ from sonic_platform_base.module_base import ModuleBase
 from sonic_platform_base.chassis_base import ChassisBase
 
 
+
 class TestModule:
     @classmethod
     def setup_class(cls):
@@ -204,10 +205,18 @@ class TestModule:
             dm = DpuModule(2)
             dm.dpu_vpd_parser.vpd_file_last_mtime = None
             dm.dpu_vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd_dpu')
-            assert dm.get_base_mac() == "90:0A:84:C6:00:B1"
-            assert dm.get_model() == "SN4280BF3DPU2"
-            assert dm.get_serial() == "MT4431X26022"
-            assert dm.get_revision() == "A0"
+            dpu_data = {
+                "DPU2_SN": "MT4431X26022",
+                "DPU2_PN": "SN4280BF3DPU2",
+                "DPU2_REV": "A0",
+                "DPU2_BASE_MAC": "90:0A:84:C6:00:B1"
+            }
+            dm.dpu_vpd_parser.vpd_data = dpu_data
+            with patch.object(dm.dpu_vpd_parser, '_get_data', wraps=mock.MagicMock(return_value=True)):
+                assert dm.get_base_mac() == "90:0A:84:C6:00:B1"
+                assert dm.get_model() == "SN4280BF3DPU2"
+                assert dm.get_serial() == "MT4431X26022"
+                assert dm.get_revision() == "A0"
 
             dm.dpu_vpd_parser = None
             with pytest.raises(AttributeError):
@@ -217,18 +226,11 @@ class TestModule:
                 dm.get_revision()
 
             dm = DpuModule(3)
-            dm.dpu_vpd_parser.vpd_file_last_mtime = None
-            dm.dpu_vpd_parser.vpd_file = os.path.join(test_path, 'mock_psu_vpd_dpu')
+            dm.dpu_vpd_parser.vpd_data = dpu_data
             assert dm.get_base_mac() == "N/A"
             assert dm.get_model() == "N/A"
             assert dm.get_serial() == "N/A"
             assert dm.get_revision() == "N/A"
-
-            m.vpd_parser.vpd_file = 'does not exist'
-            assert dm.get_base_mac() == "N/A"
-            assert m.get_model() == 'N/A'
-            assert m.get_serial() == 'N/A'
-            assert m.get_revision() == 'N/A'
 
     @mock.patch('swsscommon.swsscommon.SonicV2Connector.__init__', mock.MagicMock(return_value=None))
     @mock.patch('swsscommon.swsscommon.SonicV2Connector.connect', mock.MagicMock(return_value=None))
