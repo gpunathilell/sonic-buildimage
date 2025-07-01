@@ -175,6 +175,14 @@ class TestDpuCtlPlatPower:
              patch.object(dpuctl_obj, 'log_info') as mock_log:
             assert dpuctl_obj.dpu_power_off(False)
             assert "Skipping DPU power off as DPU is already powered off" in mock_log.call_args_list[-1].args[0]
+        # Test skip_pre_post parameter
+        with patch.object(dpuctl_obj, 'write_file', wraps=mock_write_file), \
+             patch.object(dpuctl_obj, 'read_boot_prog', MagicMock(return_value=BootProgEnum.OS_RUN.value)), \
+             patch.object(dpuctl_obj, 'dpu_pre_shutdown') as mock_pre_shutdown:
+            assert dpuctl_obj.dpu_power_off(False, skip_pre_post=True)
+            mock_pre_shutdown.assert_not_called()
+            assert dpuctl_obj.dpu_power_off(False, skip_pre_post=False)
+            mock_pre_shutdown.assert_called_once()
 
     @patch('os.path.exists', MagicMock(return_value=True))
     @patch('sonic_platform.inotify_helper.InotifyHelper.wait_watch')
@@ -212,6 +220,11 @@ class TestDpuCtlPlatPower:
             assert written_data[0]["file"].endswith("_pwr")
             assert written_data[1]["file"].endswith("_rst")
             assert written_data[2]["file"].endswith("rescan")
+            with patch.object(dpuctl_obj, 'dpu_post_startup') as mock_post_startup:
+                assert dpuctl_obj.dpu_power_on(False, skip_pre_post=True)
+                mock_post_startup.assert_not_called()
+                assert dpuctl_obj.dpu_power_on(False, skip_pre_post=False)
+                mock_post_startup.assert_called_once()
 
 class TestDpuCtlPlatReboot:
     """Tests for reboot functionality"""
