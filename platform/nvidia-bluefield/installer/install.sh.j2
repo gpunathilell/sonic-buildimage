@@ -27,8 +27,7 @@ declare -r DOCKERFS_DIR="{{DOCKERFS_DIR}}"
 declare -r FILESYSTEM_SQUASHFS="{{FILESYSTEM_SQUASHFS}}"
 declare -r KERNEL_VERSION="{{KERNEL_VERSION}}"
 declare -r BF2_GRUB_CFG="{{BF2_GRUB_CFG}}"
-declare -r BF3_SIXTEEN_CORE_GRUB_CFG="{{BF3_SIXTEEN_CORE_GRUB_CFG}}"
-declare -r BF3_EIGHT_CORE_GRUB_CFG="{{BF3_EIGHT_CORE_GRUB_CFG}}"
+declare -r BF3_GRUB_CFG="{{BF3_GRUB_CFG}}"
 
 declare -r image_dir="image-$IMAGE_VERSION"
 declare -r demo_volume_revision_label="SONiC-OS-${IMAGE_VERSION}"
@@ -245,13 +244,11 @@ chmod a+r /mnt/machine.conf
 
 sync
 
+sonic_fs_path="/mnt/$image_dir/fs.squashfs"
+sonic_fs_mountpoint="/tmp/$image_dir-fs"
+ex mkdir -p $sonic_fs_mountpoint
+ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
 if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
-	sonic_fs_path="/mnt/$image_dir/fs.squashfs"
-	sonic_fs_mountpoint="/tmp/$image_dir-fs"
-
-	ex mkdir -p $sonic_fs_mountpoint
-	ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
-
 	kernel_mft=$(chroot $sonic_fs_mountpoint dpkg -l | grep kernel-mft-dkms-modules | awk '/^ii/ {print $2}')
 	mft_files=$(chroot $sonic_fs_mountpoint dpkg -L $kernel_mft)
 
@@ -285,8 +282,15 @@ if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
 		ex $sonic_fs_mountpoint/usr/bin/mlnx-fw-upgrade.sh -v -r --no-mst
 	fi
 
-	ex umount $sonic_fs_mountpoint
 fi
+if [[ -f $sonic_fs_mountpoint/usr/share/sonic/device/$platform/installer.conf ]]; then
+    . $sonic_fs_mountpoint/usr/share/sonic/device/$platform/installer.conf
+	if [[ -n "$GRUB_CMDLINE_LINUX" || -n "$ONIE_PLATFORM_EXTRA_CMDLINE_LINUX" ]]; then
+		GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX $ONIE_PLATFORM_EXTRA_CMDLINE_LINUX"
+	fi
+fi
+
+ex umount $sonic_fs_mountpoint
 
 if function_exists bfb_post_sonic_install; then
 	log "Running bfb_post_sonic_install from bf.cfg"
@@ -331,13 +335,9 @@ grub_cfg=$(mktemp)
 # Modify GRUB_CMDLINE_LINUX from bf.cfg file if required
 
 if [[ $module == "BF3" ]]; then
-    if [[ $platform == *"9009d3b400"* ]]; then	
-        DEFAULT_GRUB_CMDLINE_LINUX=$BF3_EIGHT_CORE_GRUB_CFG
-    else
-        DEFAULT_GRUB_CMDLINE_LINUX=$BF3_SIXTEEN_CORE_GRUB_CFG
-    fi
+    DEFAULT_GRUB_CMDLINE_LINUX:=$BF3_GRUB_CFG
 else
-    DEFAULT_GRUB_CMDLINE_LINUX=$BF2_GRUB_CFG
+    DEFAULT_GRUB_CMDLINE_LINUX:=$BF2_GRUB_CFG
 fi
 
 GRUB_CMDLINE_LINUX=${GRUB_CMDLINE_LINUX:-"$DEFAULT_GRUB_CMDLINE_LINUX"}
