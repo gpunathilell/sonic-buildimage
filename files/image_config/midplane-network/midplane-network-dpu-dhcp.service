@@ -1,0 +1,16 @@
+# Oneshot midplane network DHCP service
+
+[Unit]
+Description=Midplane network DHCP service for DPU
+RequiredBy=midplane-network-dpu.service
+Before=midplane-network-dpu.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/request-dpu-midplane-ip.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

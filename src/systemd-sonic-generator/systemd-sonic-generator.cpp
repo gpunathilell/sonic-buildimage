@@ -549,6 +549,8 @@ int get_unit_files(const char* config_file, char* unit_files[], int unit_files_s
             continue;
         } else if ((strcmp(line, "midplane-network-npu.service") == 0) &&
                         !smart_switch_npu) {
+        } else if ((strcmp(line, "midplane-network-dpu-dhcp.service") == 0) &&
+                        !smart_switch_dpu) {
             continue;
         }
 

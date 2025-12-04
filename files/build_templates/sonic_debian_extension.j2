@@ -684,6 +684,10 @@ sudo cp $IMAGE_CONFIGS/midplane-network/midplane-network-dpu.network $FILESYSTEM
 sudo cp $IMAGE_CONFIGS/midplane-network/midplane-network-npu.service $FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM/midplane-network-npu.service
 sudo cp $IMAGE_CONFIGS/midplane-network/midplane-network-dpu.service $FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM/midplane-network-dpu.service
 
+sudo cp $IMAGE_CONFIGS/midplane-network/midplane-network-dpu-dhcp.service $FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM/midplane-network-dpu-dhcp.service
+sudo cp $IMAGE_CONFIGS/midplane-network/request-dpu-midplane-ip.sh $FILESYSTEM_ROOT/usr/bin/request-dpu-midplane-ip.sh
+sudo chmod 755 $FILESYSTEM_ROOT/usr/bin/request-dpu-midplane-ip.sh
+
 # Disable smart switch unit by default, these units will be controlled by systemd-sonic-generator
 sudo ln -s /dev/null $FILESYSTEM_ROOT/etc/systemd/network/bridge-midplane.netdev
 sudo ln -s /dev/null $FILESYSTEM_ROOT/etc/systemd/network/bridge-midplane.network
