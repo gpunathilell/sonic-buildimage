@@ -99,8 +99,30 @@ if [ -e /etc/bf.cfg ]; then
 fi
 
 # Flags that can be overwritten by the bf.cfg
-declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-false}"
 declare -r FORCE_FW_CONFIG_RESET="${FORCE_FW_CONFIG_RESET:-false}"
+
+# List of platforms that should skip firmware upgrade
+PLATFORMS_SKIP_FW_UPGRADE=(
+	"9009d3b600"
+	"9009d3b400"
+)
+
+# Check if current platform matches any in the skip list
+skip_fw=false
+for platform_id in "${PLATFORMS_SKIP_FW_UPGRADE[@]}"; do
+	if [[ $platform == *"$platform_id"* ]]; then
+		skip_fw=true
+		break
+	fi
+done
+
+if [[ $skip_fw == true ]]; then
+	declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-true}"
+	reboot_is_needed=true
+else
+	declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-false}"
+	reboot_is_needed=false
+fi
 
 ex() {
     echo "Executing command: $@" > /dev/ttyAMA0
@@ -222,13 +244,11 @@ chmod a+r /mnt/machine.conf
 
 sync
 
+sonic_fs_path="/mnt/$image_dir/fs.squashfs"
+sonic_fs_mountpoint="/tmp/$image_dir-fs"
+ex mkdir -p $sonic_fs_mountpoint
+ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
 if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
-	sonic_fs_path="/mnt/$image_dir/fs.squashfs"
-	sonic_fs_mountpoint="/tmp/$image_dir-fs"
-
-	ex mkdir -p $sonic_fs_mountpoint
-	ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
-
 	kernel_mft=$(chroot $sonic_fs_mountpoint dpkg -l | grep kernel-mft-dkms-modules | awk '/^ii/ {print $2}')
 	mft_files=$(chroot $sonic_fs_mountpoint dpkg -L $kernel_mft)
 
@@ -262,8 +282,15 @@ if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
 		ex $sonic_fs_mountpoint/usr/bin/mlnx-fw-upgrade.sh -v -r --no-mst
 	fi
 
-	ex umount $sonic_fs_mountpoint
 fi
+if [[ -f $sonic_fs_mountpoint/usr/share/sonic/device/$platform/installer.conf ]]; then
+    . $sonic_fs_mountpoint/usr/share/sonic/device/$platform/installer.conf
+	if [[ -n "$GRUB_CMDLINE_LINUX" || -n "$ONIE_PLATFORM_EXTRA_CMDLINE_LINUX" ]]; then
+		GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX $ONIE_PLATFORM_EXTRA_CMDLINE_LINUX"
+	fi
+fi
+
+ex umount $sonic_fs_mountpoint
 
 if function_exists bfb_post_sonic_install; then
 	log "Running bfb_post_sonic_install from bf.cfg"
@@ -308,9 +335,9 @@ grub_cfg=$(mktemp)
 # Modify GRUB_CMDLINE_LINUX from bf.cfg file if required
 
 if [[ $module == "BF3" ]]; then
-    DEFAULT_GRUB_CMDLINE_LINUX=$BF3_GRUB_CFG
+    DEFAULT_GRUB_CMDLINE_LINUX:=$BF3_GRUB_CFG
 else
-    DEFAULT_GRUB_CMDLINE_LINUX=$BF2_GRUB_CFG
+    DEFAULT_GRUB_CMDLINE_LINUX:=$BF2_GRUB_CFG
 fi
 
 GRUB_CMDLINE_LINUX=${GRUB_CMDLINE_LINUX:-"$DEFAULT_GRUB_CMDLINE_LINUX"}
@@ -442,7 +469,12 @@ fi
 
 rshim_log "Installation finished"
 
-rshim_log "Waiting for reset from the host..."
-while true; do
-	sleep 1
-done
+
+if [[ $reboot_is_needed == "false" ]]; then
+	rshim_log "Waiting for reset from the host..."
+	while true; do
+		sleep 1
+	done
+fi
+rshim_log "Rebooting..."
+reboot -f
