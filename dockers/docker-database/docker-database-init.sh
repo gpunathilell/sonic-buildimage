@@ -30,7 +30,7 @@ fi
 
 if [[ $IS_DPU_DEVICE == "true" ]]
 then
-    if [[ $IS_APPLIANCE_DPU == "false" ]]; then
+    if [[ $IS_APPLIANCE_DPU != "true" ]]; then
         midplane_ip=$( ip -4 -o addr show eth0-midplane | awk '{print $4}' | cut -d'/' -f1  )
         if [[ $midplane_ip != "" ]]
         then
