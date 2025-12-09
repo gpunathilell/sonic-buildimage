@@ -101,28 +101,7 @@ fi
 # Flags that can be overwritten by the bf.cfg
 declare -r FORCE_FW_CONFIG_RESET="${FORCE_FW_CONFIG_RESET:-false}"
 
-# List of platforms that should skip firmware upgrade
-PLATFORMS_SKIP_FW_UPGRADE=(
-	"9009d3b600"
-	"9009d3b400"
-)
 
-# Check if current platform matches any in the skip list
-skip_fw=false
-for platform_id in "${PLATFORMS_SKIP_FW_UPGRADE[@]}"; do
-	if [[ $platform == *"$platform_id"* ]]; then
-		skip_fw=true
-		break
-	fi
-done
-
-if [[ $skip_fw == true ]]; then
-	declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-true}"
-	reboot_is_needed=true
-else
-	declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-false}"
-	reboot_is_needed=false
-fi
 
 ex() {
     echo "Executing command: $@" > /dev/ttyAMA0
@@ -248,6 +227,29 @@ sonic_fs_path="/mnt/$image_dir/fs.squashfs"
 sonic_fs_mountpoint="/tmp/$image_dir-fs"
 ex mkdir -p $sonic_fs_mountpoint
 ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
+
+
+# Check if platform.json exists and contains SKIP_FW_UPDATE key
+platform_json_path="/mnt/$image_dir/platform/$platform/platform.json"
+skip_fw=false
+reboot_is_needed=false
+
+if [[ -f "$platform_json_path" ]]; then
+	log "Checking for SKIP_FW_UPDATE key in $platform_json_path"
+	# Check if SKIP_FW_UPDATE key exists in platform.json (regardless of value)
+	if grep -q '"SKIP_FW_UPDATE"' "$platform_json_path"; then
+		skip_fw=true
+		reboot_is_needed=true
+		log "SKIP_FW_UPDATE key found in platform.json - skipping firmware upgrade"
+	else
+		log "SKIP_FW_UPDATE key not found in platform.json - firmware upgrade will proceed"
+	fi
+else
+	log "Warning: platform.json not found at $platform_json_path"
+fi
+
+declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-$skip_fw}"
+
 if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
 	kernel_mft=$(chroot $sonic_fs_mountpoint dpkg -l | grep kernel-mft-dkms-modules | awk '/^ii/ {print $2}')
 	mft_files=$(chroot $sonic_fs_mountpoint dpkg -L $kernel_mft)

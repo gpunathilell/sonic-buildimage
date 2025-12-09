@@ -31,5 +31,7 @@
             }
         }
     },
-    "APPLIANCE_DPU": {}
+    "APPLIANCE_DPU": "",
+    "SKIP_FW_UPDATE": "",
+    "HUGEPAGES": "4096"
 }

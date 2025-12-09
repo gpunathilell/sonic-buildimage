@@ -33,5 +33,6 @@
             }
         }
     },
-    "APPLIANCE_DPU": {}
+    "APPLIANCE_DPU": "",
+    "SKIP_FW_UPDATE": "true"
 }

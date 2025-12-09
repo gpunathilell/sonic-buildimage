@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
 # Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -61,12 +61,15 @@ configure_syncd_init_common() {
         mkdir -p "$SDK_DUMP_PATH"
     fi
 
-    if [[ $platform == "arm64-nvda_bf-9009d3b400ccea" ]]; then
-        # 8 cores DPU, reduce hugepages to 4096
-        echo 4096 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-    else
-        echo 9216 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+    platform_json_path="/mnt/$image_dir/platform/$platform/platform.json"
+
+    hugepages=$(jq -r '.HUGEPAGES' $platform_json_path)
+    if [ -z "$hugepages" ]; then
+        hugepages=9216
     fi
+
+    echo $hugepages > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+
     mkdir -p /mnt/huge
     mount -t hugetlbfs pagesize=1GB /mnt/huge
 
