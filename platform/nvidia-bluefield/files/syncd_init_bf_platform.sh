@@ -61,7 +61,7 @@ configure_syncd_init_common() {
         mkdir -p "$SDK_DUMP_PATH"
     fi
 
-    platform_json_path="/mnt/$image_dir/platform/$platform/platform.json"
+    platform_json_path="/usr/share/sonic/platform/platform.json"
 
     hugepages=$(jq -r '.HUGEPAGES' $platform_json_path)
     if [ -z "$hugepages" ]; then

@@ -230,7 +230,7 @@ ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
 
 
 # Check if platform.json exists and contains SKIP_FW_UPDATE key
-platform_json_path="/mnt/$image_dir/platform/$platform/platform.json"
+platform_json_path="$sonic_fs_mountpoint/usr/share/sonic/device/$platform/platform.json"
 skip_fw=false
 reboot_is_needed=false
 
@@ -249,6 +249,7 @@ else
 fi
 
 declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-$skip_fw}"
+log "SKIP_FW_UPDATE is set to $SKIP_FIRMWARE_UPGRADE"
 
 if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
 	kernel_mft=$(chroot $sonic_fs_mountpoint dpkg -l | grep kernel-mft-dkms-modules | awk '/^ii/ {print $2}')
