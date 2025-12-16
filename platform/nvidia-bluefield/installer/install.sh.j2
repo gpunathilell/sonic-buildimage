@@ -239,16 +239,24 @@ if [[ -f "$platform_json_path" ]]; then
 	# Check if SKIP_FW_UPDATE key exists in platform.json (regardless of value)
 	if grep -q '"SKIP_FW_UPDATE"' "$platform_json_path"; then
 		skip_fw=true
-		reboot_is_needed=true
 		log "SKIP_FW_UPDATE key found in platform.json - skipping firmware upgrade"
 	else
 		log "SKIP_FW_UPDATE key not found in platform.json - firmware upgrade will proceed"
+	fi
+	
+	# Check if SELF_REBOOT key exists in platform.json (regardless of value)
+	if grep -q '"SELF_REBOOT"' "$platform_json_path"; then
+		reboot_is_needed=true
+		log "SELF_REBOOT key found in platform.json"
+	else
+		log "SELF_REBOOT key not found in platform.json"
 	fi
 else
 	log "Warning: platform.json not found at $platform_json_path"
 fi
 
 declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-$skip_fw}"
+declare -r SELF_REBOOT="${SELF_REBOOT:-$reboot_is_needed}"
 log "SKIP_FW_UPDATE is set to $SKIP_FIRMWARE_UPGRADE"
 
 if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
@@ -473,7 +481,7 @@ fi
 rshim_log "Installation finished"
 
 
-if [[ $reboot_is_needed == "false" ]]; then
+if [[ $SELF_REBOOT == "false" ]]; then
 	rshim_log "Waiting for reset from the host..."
 	while true; do
 		sleep 1

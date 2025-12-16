@@ -34,5 +34,6 @@
         }
     },
     "APPLIANCE_DPU": "",
-    "SKIP_FW_UPDATE": "true"
+    "SELF_REBOOT": "",
+    "SKIP_FW_UPDATE": ""
 }

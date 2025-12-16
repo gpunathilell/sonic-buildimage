@@ -33,5 +33,6 @@
     },
     "APPLIANCE_DPU": "",
     "SKIP_FW_UPDATE": "",
+    "SELF_REBOOT": "",
     "HUGEPAGES": "4096"
 }
