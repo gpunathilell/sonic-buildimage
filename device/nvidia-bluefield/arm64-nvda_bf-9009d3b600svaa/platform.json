@@ -32,5 +32,7 @@
                 "1x200G": ["etp2"]
             }
         }
-    }
+    },
+    "SKIP_FW_UPDATE": "",
+    "SELF_REBOOT": ""
 }

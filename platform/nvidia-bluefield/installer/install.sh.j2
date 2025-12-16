@@ -99,8 +99,9 @@ if [ -e /etc/bf.cfg ]; then
 fi
 
 # Flags that can be overwritten by the bf.cfg
-declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-false}"
 declare -r FORCE_FW_CONFIG_RESET="${FORCE_FW_CONFIG_RESET:-false}"
+
+
 
 ex() {
     echo "Executing command: $@" > /dev/ttyAMA0
@@ -222,13 +223,43 @@ chmod a+r /mnt/machine.conf
 
 sync
 
+sonic_fs_path="/mnt/$image_dir/fs.squashfs"
+sonic_fs_mountpoint="/tmp/$image_dir-fs"
+ex mkdir -p $sonic_fs_mountpoint
+ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
+
+
+# Check if platform.json exists and contains SKIP_FW_UPDATE key
+platform_json_path="$sonic_fs_mountpoint/usr/share/sonic/device/$platform/platform.json"
+skip_fw=false
+reboot_is_needed=false
+
+if [[ -f "$platform_json_path" ]]; then
+	log "Checking for SKIP_FW_UPDATE key in $platform_json_path"
+	# Check if SKIP_FW_UPDATE key exists in platform.json (regardless of value)
+	if grep -q '"SKIP_FW_UPDATE"' "$platform_json_path"; then
+		skip_fw=true
+		log "SKIP_FW_UPDATE key found in platform.json - skipping firmware upgrade"
+	else
+		log "SKIP_FW_UPDATE key not found in platform.json - firmware upgrade will proceed"
+	fi
+	
+	# Check if SELF_REBOOT key exists in platform.json (regardless of value)
+	if grep -q '"SELF_REBOOT"' "$platform_json_path"; then
+		reboot_is_needed=true
+		log "SELF_REBOOT key found in platform.json"
+	else
+		log "SELF_REBOOT key not found in platform.json"
+	fi
+else
+	log "Warning: platform.json not found at $platform_json_path"
+fi
+
+declare -r SKIP_FIRMWARE_UPGRADE="${SKIP_FIRMWARE_UPGRADE:-$skip_fw}"
+declare -r SELF_REBOOT="${SELF_REBOOT:-$reboot_is_needed}"
+log "SKIP_FW_UPDATE is set to $SKIP_FIRMWARE_UPGRADE"
+
 if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
-	sonic_fs_path="/mnt/$image_dir/fs.squashfs"
-	sonic_fs_mountpoint="/tmp/$image_dir-fs"
-
-	ex mkdir -p $sonic_fs_mountpoint
-	ex mount -t squashfs $sonic_fs_path $sonic_fs_mountpoint
-
 	kernel_mft=$(chroot $sonic_fs_mountpoint dpkg -l | grep kernel-mft-dkms-modules | awk '/^ii/ {print $2}')
 	mft_files=$(chroot $sonic_fs_mountpoint dpkg -L $kernel_mft)
 
@@ -262,8 +293,15 @@ if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
 		ex $sonic_fs_mountpoint/usr/bin/mlnx-fw-upgrade.sh -v -r --no-mst
 	fi
 
-	ex umount $sonic_fs_mountpoint
 fi
+if [[ -f $sonic_fs_mountpoint/usr/share/sonic/device/$platform/installer.conf ]]; then
+    . $sonic_fs_mountpoint/usr/share/sonic/device/$platform/installer.conf
+	if [[ -n "$GRUB_CMDLINE_LINUX" || -n "$ONIE_PLATFORM_EXTRA_CMDLINE_LINUX" ]]; then
+		GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX $ONIE_PLATFORM_EXTRA_CMDLINE_LINUX"
+	fi
+fi
+
+ex umount $sonic_fs_mountpoint
 
 if function_exists bfb_post_sonic_install; then
 	log "Running bfb_post_sonic_install from bf.cfg"
@@ -308,9 +346,9 @@ grub_cfg=$(mktemp)
 # Modify GRUB_CMDLINE_LINUX from bf.cfg file if required
 
 if [[ $module == "BF3" ]]; then
-    DEFAULT_GRUB_CMDLINE_LINUX=$BF3_GRUB_CFG
+    DEFAULT_GRUB_CMDLINE_LINUX:=$BF3_GRUB_CFG
 else
-    DEFAULT_GRUB_CMDLINE_LINUX=$BF2_GRUB_CFG
+    DEFAULT_GRUB_CMDLINE_LINUX:=$BF2_GRUB_CFG
 fi
 
 GRUB_CMDLINE_LINUX=${GRUB_CMDLINE_LINUX:-"$DEFAULT_GRUB_CMDLINE_LINUX"}
@@ -442,7 +480,12 @@ fi
 
 rshim_log "Installation finished"
 
-rshim_log "Waiting for reset from the host..."
-while true; do
-	sleep 1
-done
+
+if [[ $SELF_REBOOT == "false" ]]; then
+	rshim_log "Waiting for reset from the host..."
+	while true; do
+		sleep 1
+	done
+fi
+rshim_log "Rebooting..."
+reboot -f
