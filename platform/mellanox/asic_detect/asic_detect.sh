@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -64,7 +64,7 @@ if [[ -n "$lspci_output" ]]; then
     for key in "${DEVICE_ORDER[@]}"; do
         if echo "$lspci_output" | grep "$VENDOR_ID:$key" &>/dev/null; then
             DEVICE_TYPE="${DEVICE_DICT[$key]}"
-            DEVICE_PCI_ID=$(echo "$lspci_output" | grep "$VENDOR_ID:$key" | awk '{print $1}')
+            DEVICE_PCI_ID=$(echo "$lspci_output" | grep "$VENDOR_ID:$key" | awk '{print $1}' | head -n 1)
             RC=$SUCCESS_CODE
             break
         fi

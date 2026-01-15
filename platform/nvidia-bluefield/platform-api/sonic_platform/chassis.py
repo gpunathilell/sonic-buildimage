@@ -1,6 +1,7 @@
 #
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
-# Apache-2.0
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -315,7 +316,7 @@ class Chassis(ChassisBase):
         Returns:
             Returns:True for SmartSwitch and False for other platforms
         """
-        return True
+        return self.device_data.is_smartswitch()
 
     def is_dpu(self):
         """
