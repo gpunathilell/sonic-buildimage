@@ -1,6 +1,6 @@
 {
     "chassis": {
-        "name": "Nvidia-9009d3b600CVAA",
+        "name": "Nvidia-9009d3b400CCEA",
         "components": [],
         "fans": [],
         "fan_drawers": [],
@@ -20,7 +20,6 @@
             "index": "1,1,1,1",
             "lanes": "0,1,2,3",
             "breakout_modes": {
-                "1x100G": ["etp1"],
                 "1x200G": ["etp1"]
             }
         },
@@ -28,12 +27,12 @@
             "index": "2,2,2,2",
             "lanes": "4,5,6,7",
             "breakout_modes": {
-                "1x100G": ["etp2"],
                 "1x200G": ["etp2"]
             }
         }
     },
     "APPLIANCE_DPU": "",
+    "SKIP_FW_UPDATE": "",
     "SELF_REBOOT": "",
-    "SKIP_FW_UPDATE": ""
+    "HUGEPAGES": "4096"
 }

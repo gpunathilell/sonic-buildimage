@@ -30,6 +30,11 @@ include $(PLATFORM_PATH)/$(RECIPE_DIR)/docker-syncd-bluefield.mk
 include $(PLATFORM_PATH)/$(RECIPE_DIR)/installer-image.mk
 include $(PLATFORM_PATH)/$(RECIPE_DIR)/component-versions.mk
 
+INIT_BF_PLATFORM_SH = syncd_init_bf_platform.sh
+$(INIT_BF_PLATFORM_SH)_PATH = $(PLATFORM_PATH)/files/
+SONIC_COPY_FILES += $(INIT_BF_PLATFORM_SH)
+
+
 # Inject DPU sai into syncd
 $(SYNCD)_DEPENDS += $(DPU_SAI)
 $(SYNCD)_UNINSTALLS += $(DPU_SAI)
