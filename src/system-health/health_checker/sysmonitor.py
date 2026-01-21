@@ -18,7 +18,7 @@ import jinja2
 SYSLOG_IDENTIFIER = "system#monitor"
 REDIS_TIMEOUT_MS = 0
 system_allsrv_state = "DOWN"
-spl_srv_list = ['database-chassis', 'gbsyncd']
+spl_srv_list = ['database-chassis', 'gbsyncd', 'gnoi-shutdown']
 SELECT_TIMEOUT_MSECS = 1000
 QUEUE_TIMEOUT = 15
 TASK_STOP_TIMEOUT = 10
