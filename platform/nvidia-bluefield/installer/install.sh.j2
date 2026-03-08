@@ -115,6 +115,19 @@ ex() {
     fi
 }
 
+# Run command like ex(); on failure start an interactive bash session for debugging
+ex_or_bash_session() {
+    echo "Executing command: $@" > /dev/ttyAMA0
+    local rc=0
+    $@ 2>&1 > /dev/ttyAMA0
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "RC: $rc" > /dev/ttyAMA0
+        log "Command failed (exit $rc), starting debug bash session"
+        run_bash_session
+    fi
+}
+
 if (lspci -n -d 15b3: | grep -wq 'a2dc'); then
 	module=BF3
 	if [[ $DHCP_CLASS_ID != "" ]]; then
@@ -247,10 +260,10 @@ if [[ $SKIP_FIRMWARE_UPGRADE != "true" ]]; then
 	fi
 
 	ex chroot $sonic_fs_mountpoint mst start
-	ex chroot $sonic_fs_mountpoint /usr/local/bin/mlnx-fw-manager --nosyslog --verbose
+	ex_or_bash_session chroot $sonic_fs_mountpoint /usr/local/bin/mlnx-fw-manager --nosyslog --verbose
 
 	if [[ $FORCE_FW_CONFIG_RESET == "true" ]]; then
-		ex chroot $sonic_fs_mountpoint /usr/local/bin/mlnx-fw-manager --reset --nosyslog --verbose
+		ex_or_bash_session chroot $sonic_fs_mountpoint /usr/local/bin/mlnx-fw-manager --reset --nosyslog --verbose
 	fi
 
 	ex umount $sonic_fs_mountpoint/host
