@@ -479,11 +479,15 @@ class Sysmonitor(ThreadTaskBase):
 
         return 0
 
-    def _wait_for_monitor_subscriptions(self, dbus_ready, statedb_ready):
+    def _wait_for_monitor_subscriptions(self, dbus_ready, statedb_ready,
+                                        monitor_system_bus=None, monitor_statedb_table=None):
         """Block until both monitor threads signal listener registration.
 
         Single monotonic deadline: total wall time is at most SUBSCRIPTION_READY_TIMEOUT_SEC
         (both threads already run in parallel).
+
+        On timeout, stops monitor tasks before exiting so non-daemon threads do not stall
+        interpreter shutdown.
         """
         deadline = time.monotonic() + SUBSCRIPTION_READY_TIMEOUT_SEC
         monitors = (
@@ -495,6 +499,10 @@ class Sysmonitor(ThreadTaskBase):
             if not ev.wait(timeout=max(0.0, remaining)):
                 logger.log_error(
                     "Timeout: {} within {}s (combined budget)".format(detail, SUBSCRIPTION_READY_TIMEOUT_SEC))
+                if monitor_system_bus is not None:
+                    monitor_system_bus.task_stop()
+                if monitor_statedb_table is not None:
+                    monitor_statedb_table.task_stop()
                 sys.exit(1)
 
     def system_service(self):
@@ -516,7 +524,8 @@ class Sysmonitor(ThreadTaskBase):
             logger.log_error("monitor threads-{}".format(str(e)))
             sys.exit(1)
 
-        self._wait_for_monitor_subscriptions(dbus_ready, statedb_ready)
+        self._wait_for_monitor_subscriptions(
+            dbus_ready, statedb_ready, monitor_system_bus, monitor_statedb_table)
         self.update_system_status()
 
         from queue import Empty
