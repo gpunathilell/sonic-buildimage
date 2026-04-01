@@ -24,7 +24,7 @@ NON_BLOCKING_INACTIVE_REASONS = {"exec-condition"}
 SELECT_TIMEOUT_MSECS = 1000
 QUEUE_TIMEOUT = 15
 TASK_STOP_TIMEOUT = 10
-# Max time for monitor threads to finish Subscribe / FEATURE listener setup before initial service scan
+# Combined wall-clock budget for both monitor threads to signal readiness before initial service scan
 SUBSCRIPTION_READY_TIMEOUT_SEC = 60
 logger = Logger(log_identifier=SYSLOG_IDENTIFIER)
 exclude_srv_list = ['ztp.service']
@@ -480,15 +480,22 @@ class Sysmonitor(ThreadTaskBase):
         return 0
 
     def _wait_for_monitor_subscriptions(self, dbus_ready, statedb_ready):
-        """Block until monitor threads signal listener registration; avoids missing JobRemoved before Subscribe()."""
-        if not dbus_ready.wait(timeout=SUBSCRIPTION_READY_TIMEOUT_SEC):
-            logger.log_error(
-                "Timeout: systemd dbus monitor did not finish Subscribe within {}s".format(SUBSCRIPTION_READY_TIMEOUT_SEC))
-            sys.exit(1)
-        if not statedb_ready.wait(timeout=SUBSCRIPTION_READY_TIMEOUT_SEC):
-            logger.log_error(
-                "Timeout: STATE_DB FEATURE monitor did not finish subscribing within {}s".format(SUBSCRIPTION_READY_TIMEOUT_SEC))
-            sys.exit(1)
+        """Block until both monitor threads signal listener registration.
+
+        Single monotonic deadline: total wall time is at most SUBSCRIPTION_READY_TIMEOUT_SEC
+        (both threads already run in parallel).
+        """
+        deadline = time.monotonic() + SUBSCRIPTION_READY_TIMEOUT_SEC
+        monitors = (
+            (dbus_ready, "systemd dbus monitor did not finish Subscribe"),
+            (statedb_ready, "STATE_DB FEATURE monitor did not finish subscribing"),
+        )
+        for ev, detail in monitors:
+            remaining = deadline - time.monotonic()
+            if not ev.wait(timeout=max(0.0, remaining)):
+                logger.log_error(
+                    "Timeout: {} within {}s (combined budget)".format(detail, SUBSCRIPTION_READY_TIMEOUT_SEC))
+                sys.exit(1)
 
     def system_service(self):
         if not self.state_db:
