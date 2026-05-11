@@ -33,7 +33,8 @@ $(addprefix $(DEST)/, $(MAIN_TARGET)): $(DEST)/% :
 	pushd dpdk.org/
 	find . -type f -exec touch {} +
 
-	patch -p1 < ../0001-Remove-linux-headers-dependency.patch
+	patch -p1 < ../0001-Remove-meson-from-dependencies.patch
+	patch -p1 < ../0002-Remove-linux-headers-dependency.patch
 
 	# Build the package
 	# PATH variable is required for ninja to find the right version
